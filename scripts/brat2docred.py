@@ -1,0 +1,344 @@
+import json
+import os
+import argparse
+
+from nltk.data import load
+from nltk.tokenize import NLTKWordTokenizer
+
+from tqdm.auto import tqdm
+
+import pymorphy2
+
+# # ## Закомментируйте после первой загрузки пакета. 
+# import nltk
+# nltk.download('punkt')
+# ##
+
+ru_tokenizer = load("tokenizers/punkt/russian.pickle") # Загрузка токенизатора для русского языка
+word_tokenizer = NLTKWordTokenizer()
+
+morph = pymorphy2.MorphAnalyzer()
+
+brat2mrc_parser = argparse.ArgumentParser(description = "Brat to docred formatter script.")
+brat2mrc_parser.add_argument('--brat_dataset_path', type = str, required = True, help = "Path to brat dataset (with train, dev, test dirs).")
+brat2mrc_parser.add_argument('--ner_path', type = str, required = True, help = 'Path to ner tags file with format ["CLASS1", "CLASS2", ...].')
+brat2mrc_parser.add_argument('--rel_path', type = str, required = True, help = 'Path to relation tags file with format ["CLASS1", "CLASS2", ...].')
+brat2mrc_parser.add_argument('--docred_output_path', type = str, default = None, help = "Path, where formatted dataset would be stored. By default, same path as in --brat_dataset_path would be used.")
+
+args = brat2mrc_parser.parse_args()
+
+brat_dataset_path = args.brat_dataset_path
+
+docred_output_path = args.docred_output_path
+if docred_output_path is None:
+    docred_output_path = brat_dataset_path
+
+if not os.path.exists(docred_output_path):
+    os.makedirs(docred_output_path)
+
+ner_tags_path = args.ner_path
+
+with open(ner_tags_path, "r") as ner_tags_file:
+    ner_tags = json.loads(ner_tags_file.read())
+
+ner_tags = ["BLANK"] + sorted(ner_tags)
+
+print(ner_tags)
+
+rel_tags_path = args.rel_path
+
+with open(rel_tags_path, "r") as rel_tags_file:
+    rel_tags = json.loads(rel_tags_file.read())
+
+rel_tags = ["Na"] + sorted(rel_tags)
+
+print(rel_tags)
+
+rel_info = {}
+rel_info_inv = {}
+rel2id = {}
+
+rel2id["Na"] = 0
+
+for rel_id, rel_tag in enumerate(rel_tags[1:]):
+    rel_info["P" + str(rel_id + 1)] = rel_tag
+    rel2id["P" + str(rel_id + 1)] = rel_id
+    rel_info_inv[rel_tag] = "P" + str(rel_id + 1)
+
+with open(os.path.join(docred_output_path, "rel_info.json"), "w") as rel_info_file:
+    json.dump(rel_info, rel_info_file, ensure_ascii = False)
+
+with open(os.path.join(docred_output_path, "rel2id.json"), "w") as rel2id_file:
+    json.dump(rel2id, rel2id_file, ensure_ascii = False)
+
+ner2id = {tag : tid for tid, tag in enumerate(ner_tags)}
+
+with open(os.path.join(docred_output_path, "ner2id.json"), "w") as ner2id_file:
+    json.dump(ner2id, ner2id_file, ensure_ascii = False)
+
+# sets = ["train", "dev", "test"]
+
+sets = [""]
+
+for ds in sets:
+
+    print(ds + " set:")
+
+    total_relations_count = 0
+    total_entity_mentions_count = 0
+    total_entity_vertex_count = 0
+    total_tokenizer_errors_count = 0
+    total_relations_errors_count = 0
+
+    jsonpath = os.path.join(docred_output_path, ds + ".json")
+    jsondir = os.path.dirname(jsonpath)
+
+    if not os.path.exists(jsondir):
+        os.makedirs(jsondir)
+
+    jsonfile = open(jsonpath, "w", encoding='UTF-8') 
+
+    dataset_path = os.path.join(brat_dataset_path, ds)
+
+    docs_data = []
+
+    for ad, dirs, files in os.walk(dataset_path):
+        for f in tqdm(files):
+
+
+
+            if f[-4:] == '.ann':
+                try:
+
+                    
+
+                    if os.stat(dataset_path + '/' + f).st_size == 0:
+                        continue
+
+                    annfile = open(dataset_path + '/' + f, "r", encoding='UTF-8')
+                    txtfile = open(dataset_path + '/' + f[:-4] + ".txt", "r", encoding='UTF-8')
+
+                    doc_data = {}
+
+                    doc_data["title"] = f[:-4]
+
+
+                    txtdata = txtfile.read()
+
+                    # Шаг 1. Считать все именованные сущности и отношения из файла, закрыть файл.
+
+                    entity_mentions_ids = []
+                    entity_types = []
+                    entity_start_chars = []
+                    entity_end_chars = []
+
+                    unique_entity_mentions = {}
+
+                    relation_types = []
+                    head_mentions_ids = []
+                    tail_mentions_ids = []
+
+                    for line in annfile:
+                        line_tokens = line.split()
+                        if len(line_tokens) > 3 and len(line_tokens[0]) > 1 and line_tokens[0][0] == 'T':
+                            try:
+                                if line_tokens[1] in ner_tags:
+                                    entity_mention_id = line_tokens[0]
+                                    entity_type = line_tokens[1]
+                                    start_char = int(line_tokens[2])
+                                    end_char = int(line_tokens[3])
+                            except ValueError:
+                                continue # Все неподходящие сущности
+
+                            total_entity_mentions_count += 1
+
+                            entity_mentions_ids.append(entity_mention_id)
+                            entity_types.append(entity_type)
+                            entity_start_chars.append(start_char)
+                            entity_end_chars.append(end_char)
+                        elif len(line_tokens) > 3 and len(line_tokens[0]) > 1 and line_tokens[0][0] == 'R':
+                            try:
+                                if line_tokens[1] in rel_tags:
+                                    relation_type = line_tokens[1]
+                                    head_args = line_tokens[2].split('Arg1:')
+                                    tail_args = line_tokens[3].split('Arg2:')
+                                    head_mention_id = head_args[-1]
+                                    tail_mention_id = tail_args[-1]
+                            except ValueError:
+                                continue
+
+                            relation_types.append(relation_type)
+                            head_mentions_ids.append(head_mention_id)
+                            tail_mentions_ids.append(tail_mention_id)
+
+                    annfile.close()
+                    txtfile.close()
+
+                    # Шаг 2. В каждом файле выделить контексты отдельно друг от друга.
+
+                    offset_mapping = []
+
+                    sentence_spans = list(ru_tokenizer.span_tokenize(txtdata))
+                    tokenized_sentences = []
+                    
+                    for span in sentence_spans:
+
+                        start, end = span
+                        context = txtdata[start : end]
+
+                        word_spans = list(word_tokenizer.span_tokenize(context))
+                        tokenized_sentences.append([txtdata[s + start : e + start] for s, e in word_spans])
+                        offset_mapping.extend([(s + start, e + start) for s, e in word_spans])
+
+                    # try:
+                    #     assert len(entity_types) == len(entity_start_chars) == len(entity_end_chars)
+                    # except AssertionError:
+                    #     print(f[:-4])
+                    #     print(txtdata)
+                    #     print(entity_types)
+                    #     print(len(entity_types))
+                    #     print(entity_start_chars)
+                    #     print(len(entity_start_chars))
+                    #     print(entity_end_chars)
+                    #     print(len(entity_end_chars))
+
+                    #     for s, e, t in zip(entity_start_chars, entity_end_chars, entity_types):
+                    #         print(t, txtdata[s : e])
+
+                    #     raise AssertionError
+
+                    # Шаг 3. Составить сущности в нужный формат
+
+                    start_words, end_words = zip(*offset_mapping)
+
+                    doc_data["sents"] = tokenized_sentences
+                    
+                    for entity_mentions_id, entity_type, start_char, end_char in zip(entity_mentions_ids, entity_types, entity_start_chars, entity_end_chars):
+
+                        entity_mention = txtdata[start_char : end_char]
+                        entity_lemm_mention = morph.parse(entity_mention)[0].normal_form
+
+                        try:
+                            sent_id = [sent_id for sent_id, (sent_start, sent_end) in enumerate(sentence_spans) if sent_start <= start_char and end_char <= sent_end][0]
+                        except IndexError:
+                            total_tokenizer_errors_count += 1
+                            # print(txtdata)
+                            # print(txtdata[start_char : end_char])
+                            # print(start_char, end_char)
+                            # print(sentence_spans)
+                            # print([txtdata[sent_start : sent_end] for sent_start, sent_end in sentence_spans])
+                            continue
+
+                        tokenized_sentence = tokenized_sentences[sent_id]
+                        sentence_start, sentence_end = sentence_spans[sent_id]
+                        sentence_word_spans = [(s, e) for s, e in offset_mapping if s >= sentence_start and e <= sentence_end]
+                        sentence_start_chars = [s[0] for s in sentence_word_spans]
+                        sentence_end_chars = [s[1] for s in sentence_word_spans]
+
+                        try:
+                            start_word_idx = [start_idx for start_idx, s in enumerate(sentence_start_chars) if s == start_char][0]
+                            end_word_idx = [end_idx for end_idx, e in enumerate(sentence_end_chars) if e == end_char][0] + 1
+                        except IndexError:
+                            total_tokenizer_errors_count += 1
+                            continue
+
+                        if entity_lemm_mention not in unique_entity_mentions:
+                            unique_entity_mentions[entity_lemm_mention] = [{
+                                "name" : entity_mention,
+                                "pos" : [start_word_idx, end_word_idx],
+                                "sent_id" : sent_id,
+                                "type" : entity_type,
+                                "mention_id" : entity_mentions_id
+                            }]
+                        else:
+                            unique_entity_mentions[entity_lemm_mention].append({
+                                "name" : entity_mention,
+                                "pos" : [start_word_idx, end_word_idx],
+                                "sent_id" : sent_id,
+                                "type" : entity_type,
+                                "mention_id" : entity_mentions_id
+                            })
+
+                    doc_data["vertexSet"] = list(unique_entity_mentions.values())
+                    doc_data["labels"] = []
+
+                    for rel_type, head_mention_id, tail_mention_id in zip(relation_types, head_mentions_ids, tail_mentions_ids):
+
+                        if rel_type != "ALTERNATIVE_NAME":
+                            continue
+
+                        head_id = -1
+                        tail_id = -1
+                        head_vertex = []
+                        head_lemm = ""
+                        tail_vertex = []
+                        tail_lemm = ""
+                        for entity_id, (lemm, vertex) in enumerate(unique_entity_mentions.items()):
+                            for mention in vertex:
+                                if mention["mention_id"] == head_mention_id:
+                                    head_id = entity_id
+                                    head_lemm = lemm
+                                    head_vertex = vertex
+                                    
+                                if mention["mention_id"] == tail_mention_id:
+                                    tail_id = entity_id
+                                    tail_lemm = lemm
+                                    tail_vertex = vertex
+                                    
+                        if head_id < 0 or tail_id < 0:
+                            continue
+                        
+                        if head_id != tail_id:
+                            new_vertex = head_vertex + tail_vertex
+                            unique_entity_mentions[head_lemm] = new_vertex
+                            # print(tail_lemm in unique_entity_mentions)
+                            # print(new_vertex)
+                            del unique_entity_mentions[tail_lemm]
+                            # print(tail_lemm in unique_entity_mentions)
+                            # print(new_vertex)
+
+                        # How to count evidences?
+
+                    total_entity_vertex_count += len(unique_entity_mentions)
+
+                    for rel_type, head_mention_id, tail_mention_id in zip(relation_types, head_mentions_ids, tail_mentions_ids):
+
+                        evidences = set()
+                        head_id = -1
+                        tail_id = -1
+                        for entity_id, vertex in enumerate(unique_entity_mentions.values()):
+                            for mention in vertex:
+                                if mention["mention_id"] == head_mention_id:
+                                    head_id = entity_id
+                                    evidences.add(mention["sent_id"])
+                                if mention["mention_id"] == tail_mention_id:
+                                    tail_id = entity_id
+                                    evidences.add(mention["sent_id"])
+                        if head_id < 0 or tail_id < 0:
+                            total_relations_errors_count += 1
+                            continue
+                        total_relations_count += 1
+                        doc_data["labels"].append({
+                            "r" : rel_type,
+                            "h" : head_id,
+                            "t" : tail_id,
+                            "evidence" : sorted(list(evidences))
+                        })
+
+                    docs_data.append(doc_data)
+
+
+                except FileNotFoundError:
+                    pass
+
+
+            
+    # Вывод результатов
+    print("Total entity mentions:", total_entity_mentions_count)
+    print("Total entities:", total_entity_vertex_count)
+    print("Total relations:", total_relations_count)
+    print("Total tokenizing errors:", total_tokenizer_errors_count)
+    print("Total relation errors:", total_relations_errors_count)
+
+    json.dump(docs_data, jsonfile, ensure_ascii = False, indent = 2)
+    jsonfile.close()

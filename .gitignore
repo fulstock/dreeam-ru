@@ -6,3 +6,4 @@ checkpoints/*
 meta/*
 wandb/*
 __pycache__/*
+logs/

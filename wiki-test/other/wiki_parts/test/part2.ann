@@ -1,0 +1,152 @@
+T1	CRIME 60 80	военные преступления
+T2	DATE 85 100	В мае 2019 года
+T3	ORGANIZATION 119 134	The Daily Beast
+T4	ORGANIZATION 137 140	CNN
+T5	PERSON 155 161	Хегсет
+T6	ORDINAL 170 175	45-го
+T7	PROFESSION 176 186	президента
+T8	PROFESSION 176 190	президента США
+T9	COUNTRY 187 190	США
+T10	PERSON 191 206	Дональда Трампа
+T11	EVENT 207 217	помиловать
+T12	PROFESSION 228 242	военнослужащих
+T13	CRIME 258 278	военные преступления
+T14	COUNTRY 281 292	Афганистане
+T15	COUNTRY 295 300	Ираке
+T16	DATE 302 323	В ноябре того же года
+T17	PERSON 324 337	Дональд Трамп
+T18	EVENT 338 347	помиловал
+T19	PROFESSION 348 358	лейтенанта
+T20	PERSON 359 373	Клинта Лорэнса
+T21	EVENT 375 386	осуждённого
+T22	DATE 387 398	в 2012 году
+T23	DATE 399 408	на 19 лет
+T24	CRIME 412 435	приказ открыть стрельбу
+T25	CRIME 412 462	приказ открыть стрельбу по афганским мотоциклистам
+T26	COUNTRY 439 448	афганским
+T27	PROFESSION 465 471	майора
+T28	PERSON 472 487	Мэтью Голштейна
+T29	CRIME 504 511	самосуд
+T30	ORGANIZATION 554 562	Талибана
+T31	EVENT 572 592	восстановил в звании
+T32	PERSON 593 610	Эдварда Галлахера
+T33	CRIME 627 652	фотографирование с трупом
+T34	COUNTRY 655 660	Ираке
+T35	PERSON 681 687	Хегсет
+T36	NUMBER 731 739	COVID-19
+T37	IDEOLOGY 779 794	Демократической
+T38	ORGANIZATION 779 802	Демократической партией
+T39	ORGANIZATION 779 806	Демократической партией США
+T40	COUNTRY 803 806	США
+T41	EVENT 835 842	выборах
+T42	DATE 843 852	2022 года
+T43	DATE 901 915	каждый октябрь
+T44	DATE 901 932	каждый октябрь, каждые два года
+T45	DATE 917 932	каждые два года
+T46	DATE 957 968	В 2019 году
+T47	PERSON 969 975	Хегсет
+T48	PROFESSION 1016 1025	студентам
+T49	RELIGION 1106 1115	исламский
+T50	IDEOLOGY 1106 1126	исламский экстремизм
+T51	DATE 1128 1139	В 2022 году
+T52	ORGANIZATION 1174 1182	Гарварда
+T53	DATE 1295 1306	C молодости
+T54	COUNTRY 1333 1340	Израиля
+T55	EVENT 1345 1356	конференции
+T56	CITY 1367 1380	иерусалимской
+T57	ORGANIZATION 1395 1408	Седьмой канал
+T58	PERSON 1411 1417	Хегсет
+T59	FACILITY 1494 1508	Третьего Храма
+T60	FACILITY 1512 1525	Храмовой горе
+T61	FACILITY 1596 1609	Храмовой горы
+T62	RELIGION 1647 1656	мусульман
+T63	FACILITY 1659 1674	мечеть Аль-Акса
+T64	FACILITY 1666 1674	Аль-Акса
+T65	COUNTRY 1704 1712	Израилем
+T66	RELIGION 1728 1741	мусульманской
+T67	COUNTRY 1742 1751	Иорданией
+T68	ORGANIZATION 1780 1783	ООН
+T69	COUNTRY 1823 1826	США
+T70	IDEOLOGY 1862 1877	пропалестинскую
+T71	IDEOLOGY 1880 1895	антиизраильскую
+T72	DATE 1905 1923	В январе 2025 года
+T73	PROFESSION 1948 1955	министр
+T74	PROFESSION 1948 1963	министр обороны
+T75	PROFESSION 1948 1967	министр обороны США
+T76	COUNTRY 1964 1967	США
+T77	COUNTRY 1996 2003	Израиля
+T78	ORGANIZATION 2066 2071	ХАМАС
+T79	ORGANIZATION 2112 2116	НАТО
+T80	COUNTRY 2156 2159	США
+T81	ORGANIZATION 2163 2167	НАТО
+T82	COUNTRY 2287 2290	США
+T83	ORGANIZATION 2417 2421	НАТО
+T84	COUNTRY 2457 2460	США
+T85	LAW 2461 2495	соглашением по безопасности Европы
+T86	LOCATION 2489 2495	Европы
+T87	COUNTRY 2598 2604	Турции
+T88	ORGANIZATION 2607 2611	НАТО
+T89	PERSON 2631 2647	Реджепа Эрдогана
+T90	COUNTRY 2684 2701	Османской империи
+T91	IDEOLOGY 2703 2713	исламистом
+T92	IDEOLOGY 2727 2736	исламиста
+T93	LOCATION 2771 2787	Ближнего Востока
+T94	LOCATION 2780 2787	Востока
+T95	EVENT 2795 2811	Вторжение России
+T96	EVENT 2795 2821	Вторжение России в Украину
+T97	COUNTRY 2805 2811	России
+T98	COUNTRY 2814 2821	Украину
+T99	DATE 2826 2837	В 2022 году
+T100	COUNTRY 2845 2855	российское
+T101	EVENT 2856 2865	вторжение
+T102	COUNTRY 2868 2875	Украину
+T103	CRIME 2907 2928	разгулом преступности
+T104	DATE 2949 2969	В марте того же года
+T105	PERSON 2977 2983	Путина
+T106	ORGANIZATION 3027 3040	правительство
+T107	ORGANIZATION 3027 3048	правительство Байдена
+T108	PERSON 3041 3048	Байдена
+T109	COUNTRY 3075 3082	Украине
+T110	COUNTRY 3123 3130	Украине
+T111	EVENT 3133 3138	войне
+T112	EVENT 3133 3152	войне против России
+T113	COUNTRY 3146 3152	России
+T114	COUNTRY 3166 3169	США
+T115	IDEOLOGY 3209 3222	авторитарного
+T116	CITY 3255 3259	Киев
+T117	COUNTRY 3262 3266	СССР
+T118	PERSON 3296 3302	Трампа
+T119	COUNTRY 3324 3327	ДНР
+T120	STATE_OR_PROVINCE 3330 3333	ЛНР
+T121	DATE 3334 3344	за два дня
+T122	EVENT 3355 3364	вторжения
+T123	COUNTRY 3367 3374	Украину
+T124	PERSON 3432 3437	Путин
+T125	LOCATION 3462 3468	Европу
+T126	COUNTRY 3490 3493	США
+T127	COUNTRY 3494 3501	Украине
+T128	PERSON 3561 3568	Путиным
+T129	PERSON 3603 3612	П. Хегсет
+T130	DATE 3637 3641	2016
+T131	COUNTRY 3727 3734	America
+T132	COUNTRY 3818 3825	Америку
+T133	DATE 3829 3833	2020
+T134	COUNTRY 3836 3844	American
+T135	WORK_OF_ART 3836 3876	American Crusade: Our Fight to Stay Free
+T136	COUNTRY 3880 3892	Американский
+T137	WORK_OF_ART 3880 3947	Американский крестовый поход: наша борьба чтобы остаться свободными
+T138	DATE 3951 3955	2021
+T139	WORK_OF_ART 3958 4004	Modern Warriors: Real Stories from Real Heroes
+T140	WORK_OF_ART 4008 4076	Современные воины: реальные истории, рассказанные настоящими героями
+T141	DATE 4080 4084	2022
+T142	WORK_OF_ART 4087 4152	Battle for the American Mind: Uprooting a Century of Miseducation
+T143	COUNTRY 4102 4110	American
+T144	WORK_OF_ART 4156 4222	Битва за американский разум: искоренение столетия необразованности
+T145	COUNTRY 4165 4177	американский
+T146	DATE 4226 4230	2024
+T147	WORK_OF_ART 4233 4301	The War on Warriors: Behind the Betrayal of the Men Who Keep Us Free
+T148	PROFESSION 4461 4476	Глава Пентагона
+T149	ORGANIZATION 4467 4476	Пентагона
+T150	PERSON 4477 4489	Питер Хегсет
+T151	PERSON 4522 4537	Дональда Трампа
+T152	ORGANIZATION 4541 4550	ЦентрАзия

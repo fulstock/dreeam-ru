@@ -1,0 +1,271 @@
+HEAD -> RELATION -> TAIL
+===========================================
+    CITY          RELATION     CITY
+Форест-Лейке     LOCATED_IN    Миннеаполис
+-------------------------------------------
+CITY      RELATION     COUNTRY
+Киев     LOCATED_IN    Украину
+-------------------------------------------
+   CITY        RELATION     ORGANIZATION
+Princeton  HEADQUARTERED_IN Princeton Tory
+-------------------------------------------
+    CITY         RELATION     STATE_OR_PROVINCE
+Миннеаполис     LOCATED_IN    Миннесота
+===========================================
+ COUNTRY       RELATION     CRIME
+афганским   PARTICIPANT_IN  приказ открыть стрельбу по афганским мотоциклистам
+-------------------------------------------
+COUNTRY      RELATION     EVENT
+Украину   PARTICIPANT_IN  войне
+Украину   PARTICIPANT_IN  войне против России
+ России   PARTICIPANT_IN  войне
+ России   PARTICIPANT_IN  войне против России
+-------------------------------------------
+COUNTRY      RELATION     LAW
+  США        PRODUCES     соглашением по безопасности Европы
+-------------------------------------------
+COUNTRY      RELATION     ORGANIZATION
+ Турции     MEMBER_OF     НАТО
+===========================================
+          CRIME                RELATION     COUNTRY
+фотографирование с трупом   TAKES_PLACE_IN  Ираке
+   военные преступления     TAKES_PLACE_IN  Афганистане
+   военные преступления     TAKES_PLACE_IN  Ираке
+===========================================
+  DISTRICT       RELATION     EVENT
+Вест-Поинта   PARTICIPANT_IN  метая топор
+===========================================
+  EVENT        RELATION     COUNTRY
+Вторжение   TAKES_PLACE_IN  Украину
+вторжения   TAKES_PLACE_IN  Украину
+-------------------------------------------
+   EVENT         RELATION     CRIME
+осуждённого     HAS_CAUSE     приказ открыть стрельбу по афганским мотоциклистам
+ помиловать     HAS_CAUSE     военные преступления
+ помиловать     HAS_CAUSE     приказ открыть стрельбу по афганским мотоциклистам
+-------------------------------------------
+        EVENT             RELATION     DATE
+восстановил в звании   POINT_IN_TIME   В ноябре того же года
+ получили показания    POINT_IN_TIME   21 января
+ приведён к присяге    POINT_IN_TIME   На следующий день, 25 января 2025 года
+  выборы 2016 года     POINT_IN_TIME   2016 года
+  расторг контракт     POINT_IN_TIME   В том же месяце
+     метая топор       POINT_IN_TIME   14 июня 2015 года
+     осуждённого       POINT_IN_TIME   в 2012 году
+     помиловать        POINT_IN_TIME   В ноябре того же года
+      Дня флага        POINT_IN_TIME   14 июня 2015 года
+      подал иск        POINT_IN_TIME   В 2018 году
+      праймериз        POINT_IN_TIME   в 2016 году
+      слушаниях        POINT_IN_TIME   14 января 2025 года
+       выборах         POINT_IN_TIME   2022 года
+       выборы          POINT_IN_TIME   2016 года
+-------------------------------------------
+       EVENT            RELATION     EVENT
+получили показания     HAS_CAUSE     присягой
+    метая топор       SUBEVENT_OF    Дня флага
+===========================================
+    FACILITY         RELATION     FACILITY
+мечеть Аль-Акса     LOCATED_IN    Аль-Акса
+мечеть Аль-Акса     LOCATED_IN    Храмовой горы
+-------------------------------------------
+    FACILITY         RELATION     RELIGION
+мечеть Аль-Акса    RELIGION_OF    мусульман
+===========================================
+    IDEOLOGY         RELATION     ORGANIZATION
+Республиканской    IDEOLOGY_OF    Республиканской партии
+===========================================
+                LAW                     RELATION     LOCATION
+соглашением по безопасности Европы    ORIGINS_FROM   Европы
+===========================================
+ORDINAL      RELATION     PERSON
+ втором     FOUNDED_BY    Дональда Трампа
+===========================================
+ ORGANIZATION       RELATION     CITY
+Princeton Tory  HEADQUARTERED_IN Princeton
+ Седьмой канал  HEADQUARTERED_IN иерусалимской
+-------------------------------------------
+   ORGANIZATION        RELATION     COUNTRY
+кабинет министров  HEADQUARTERED_IN США
+-------------------------------------------
+             ORGANIZATION                  RELATION     EVENT
+Комитетом Сената по вооружённым силам   PARTICIPANT_IN  слушаниях
+пехоту Национальной гвардии Миннесоты   PARTICIPANT_IN  призван
+     пехоту Национальной гвардии        PARTICIPANT_IN  призван
+            Седьмой канал                 ORGANIZES     конференции
+               Fox News                 PARTICIPANT_IN  расторг контракт
+                Сенат                       AGENT       проголосовал
+                 Fox                    PARTICIPANT_IN  подал иск
+                 ЛНР                    PARTICIPANT_IN  вторжения
+-------------------------------------------
+     ORGANIZATION           RELATION     IDEOLOGY
+Республиканской партии    IDEOLOGY_OF    Республиканской
+-------------------------------------------
+             ORGANIZATION                  RELATION     ORGANIZATION
+Комитетом Сената по вооружённым силам      PART_OF      Сенат
+Комитетом Сената по вооружённым силам      PART_OF      Сената по вооружённым силам
+                Сенат                      PART_OF      Сената по вооружённым силам
+-------------------------------------------
+          ORGANIZATION               RELATION     PERSON
+втором кабинете Дональда Трампа     FOUNDED_BY    Дональда Трампа
+===========================================
+PERSON      RELATION     AWARD
+Хегсет    AWARDED_WITH   Бронзовая звезда
+Хегсет    AWARDED_WITH   За заслуги перед армией
+-------------------------------------------
+  PERSON        RELATION     CITY
+Пит Хегсет   PLACE_OF_BIRTH  Миннеаполис
+  Хегсет     PLACE_OF_BIRTH  Миннеаполис
+  Хегсет    PLACE_RESIDES_IN Миннеаполис
+  Хегсет    PLACE_RESIDES_IN Форест-Лейке
+  Хегсет    SCHOOLS_ATTENDED Принстонского
+-------------------------------------------
+     PERSON          RELATION     COUNTRY
+Дональда Трампа     WORKPLACE     США
+     Вэнсом         WORKPLACE     США
+-------------------------------------------
+      PERSON           RELATION     CRIME
+Эдварда Галлахера   PARTICIPANT_IN  фотографирование с трупом
+ Мэтью Голштейна     CONVICTED_OF   приказ открыть стрельбу по афганским мотоциклистам
+ Мэтью Голштейна     CONVICTED_OF   самосуд
+  Клинта Лорэнса     CONVICTED_OF   приказ открыть стрельбу по афганским мотоциклистам
+  Клинта Лорэнса     CONVICTED_OF   самосуд
+     Хегсета         CONVICTED_OF   сексуальном насилии
+     Хегсета         CONVICTED_OF   сексуальном насилии
+      Хегсет         CONVICTED_OF   публичном пьянстве
+      Хегсет         CONVICTED_OF   сексуальном насилии
+      Хегсет         CONVICTED_OF   супружеской неверности
+      Хегсет         CONVICTED_OF   физическое насилие
+-------------------------------------------
+           PERSON                 RELATION     DATE
+Пи́тер (Пит) Бра́йан Хе́гсет   DATE_OF_BIRTH   6 июня 1980
+     Peter Brian Hegseth       DATE_OF_BIRTH   6 июня 1980
+         Пит Хегсет            DATE_OF_BIRTH   6 мая 1980 года
+-------------------------------------------
+ PERSON      RELATION     DISEASE
+Хегсета MEDICAL_CONDITION инвалидности
+Хегсета MEDICAL_CONDITION серьёзные телесные повреждения
+Хегсета MEDICAL_CONDITION травмы разума
+-------------------------------------------
+      PERSON           RELATION     EVENT
+Эдварда Галлахера   PARTICIPANT_IN  восстановил в звании
+ Мэтью Голштейна    PARTICIPANT_IN  осуждённого
+  Клинта Лорэнса    PARTICIPANT_IN  осуждённого
+  Клинта Лорэнса    PARTICIPANT_IN  помиловать
+  Дональд Трамп         AGENT       восстановил в звании
+  Дональд Трамп         AGENT       помиловать
+   Марко Рубио      PARTICIPANT_IN  праймериз
+     Даниэль            AGENT       присягой
+     Хегсета            AGENT       расторг контракт
+     Даниэль        PARTICIPANT_IN  получили показания
+     Хегсета        PARTICIPANT_IN  подал иск
+     Хегсета        PARTICIPANT_IN  праймериз
+     Хегсета        PARTICIPANT_IN  приведён к присяге
+     Хегсета        PARTICIPANT_IN  слушаниях
+      Вэнсом            AGENT       приведён к присяге
+      Хегсет        PARTICIPANT_IN  конференции
+      Хегсет        PARTICIPANT_IN  призван
+      Хегсет        PARTICIPANT_IN  слушаний
+-------------------------------------------
+   PERSON        RELATION     IDEOLOGY
+Марко Рубио    IDEOLOGY_OF    Республиканской
+  Хегсета      IDEOLOGY_OF    демократов
+   Хегсет      IDEOLOGY_OF    консервативной
+-------------------------------------------
+           PERSON                 RELATION     NATIONALITY
+Пи́тер (Пит) Бра́йан Хе́гсет    ORIGINS_FROM   американский
+     Peter Brian Hegseth        ORIGINS_FROM   американский
+-------------------------------------------
+      PERSON            RELATION     ORGANIZATION
+Джона Томпсона III     WORKPLACE     Тигры
+   Питер Хегсет        WORKPLACE     Пентагона
+    Марко Рубио       IDEOLOGY_OF    Республиканской партии
+    Бетси Девос        MEMBER_OF     кабинет министров
+    Пит Хегсет         WORKPLACE     Bear Stearns
+    Пит Хегсет         WORKPLACE     Fox News
+      Хегсета          MEMBER_OF     кабинет министров
+      Хегсета          WORKPLACE     Fox
+      Хегсета          WORKPLACE     Fox News
+      Хегсет        SCHOOLS_ATTENDED Принстонского университета
+      Хегсет        SCHOOLS_ATTENDED среднюю школу
+      Хегсет           WORKPLACE     Bear Stearns
+      Хегсет           WORKPLACE     Fox News
+      Хегсет           WORKPLACE     Fox News
+      Хегсет           WORKPLACE     Корпусу подготовки офицеров запаса
+      Хегсет           WORKPLACE     Тигры
+      Хегсет           WORKPLACE     Школе государственного управления имени Джона Ф. Кеннеди
+-------------------------------------------
+   PERSON         RELATION     PERSON
+Питер Хегсет       KNOWS       Дональда Трампа
+Пенни Хегсет     PARENT_OF     Хегсет
+   Брайана       PARENT_OF     Хегсет
+   Брайана         SPOUSE      Пенни Хегсет
+   Даниэль         SPOUSE      Пита Хегсета
+-------------------------------------------
+       PERSON            RELATION     PROFESSION
+Peter Brian Hegseth      WORKS_AS     телеведущий
+ Джона Томпсона III      WORKS_AS     тренера
+  Мэтью Голштейна        WORKS_AS     майора
+  Роберта Мюллера        WORKS_AS     специального прокурора
+   Клинта Лорэнса        WORKS_AS     лейтенанта
+   Джей Ди Вэнса         WORKS_AS     вице-президента
+    Пенни Хегсет         WORKS_AS     тренера по баскетболу
+    Питер Хегсет         WORKS_AS     Глава Пентагона
+     Пит Хегсет          WORKS_AS     корреспондентом
+     Пит Хегсет          WORKS_AS     корреспондентом телеканала Fox News
+      Брайана            WORKS_AS     тренера
+      Брайана            WORKS_AS     тренера по баскетболу
+      Хегсета            WORKS_AS     барабанщик
+      Хегсета            WORKS_AS     ведущим Fox News
+       Вэнсом            WORKS_AS     вице-президента
+       Хегсет            WORKS_AS     аналитиком
+       Хегсет            WORKS_AS     аналитиком по рынкам акционерного капитала
+       Хегсет            WORKS_AS     издателем
+       Хегсет            WORKS_AS     командиром пехотного взвода
+       Хегсет            WORKS_AS     офицером
+       Хегсет            WORKS_AS     офицером по гражданско-военным операциям
+       Хегсет            WORKS_AS     сенаторы
+===========================================
+     PROFESSION          RELATION     COUNTRY
+Министр обороны США     WORKPLACE     США
+Министр обороны США     WORKPLACE     США
+министр обороны США     WORKPLACE     США
+  Министр обороны       WORKPLACE     США
+  Министр обороны       WORKPLACE     США
+  министр обороны       WORKPLACE     США
+      министр           WORKPLACE     США
+-------------------------------------------
+  PROFESSION        RELATION     CRIME
+военнослужащих    CONVICTED_OF   военные преступления
+ мотоциклистам   PARTICIPANT_IN  приказ открыть стрельбу по афганским мотоциклистам
+-------------------------------------------
+ PROFESSION      RELATION     DISTRICT
+барабанщика     WORKPLACE     Вест-Поинта
+-------------------------------------------
+  PROFESSION        RELATION     EVENT
+военнослужащих   PARTICIPANT_IN  помиловать
+ мотоциклистам   PARTICIPANT_IN  осуждённого
+  барабанщик         AGENT       подал иск
+   сенаторы      PARTICIPANT_IN  получили показания
+-------------------------------------------
+ PROFESSION      RELATION     NATIONALITY
+телеведущий    ORIGINS_FROM   американский
+-------------------------------------------
+                 PROFESSION                       RELATION     ORGANIZATION
+Политический комментатор телеканала Fox News     WORKPLACE     Fox News
+ аналитиком по рынкам акционерного капитала      WORKPLACE     Bear Stearns
+     корреспондентом телеканала Fox News         WORKPLACE     Fox News
+         офицер Национальной гвардии             WORKPLACE     Национальной гвардии
+          Политический комментатор               WORKPLACE     Fox News
+              ведущим Fox News                   WORKPLACE     Fox News
+               Глава Пентагона                   WORKPLACE     Пентагона
+               корреспондентом                   WORKPLACE     Fox News
+                 аналитиком                      WORKPLACE     Bear Stearns
+                   офицер                        WORKPLACE     Национальной гвардии
+===========================================
+STATE_OR_PROVINCE      RELATION     COUNTRY
+    Миннесота         LOCATED_IN    США
+===========================================
+                             WORK_OF_ART                                  RELATION     DATE
+The War on Warriors: Behind the Betrayal of the Men Who Keep Us Free  DATE_OF_CREATION 2024
+  Battle for the American Mind: Uprooting a Century of Miseducation   DATE_OF_CREATION 2022
+           Modern Warriors: Real Stories from Real Heroes             DATE_OF_CREATION 2021

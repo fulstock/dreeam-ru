@@ -1,0 +1,204 @@
+HEAD -> RELATION -> TAIL
+===========================================
+    CITY         RELATION     CITY
+Форест-Лейке    LOCATED_IN    Миннеаполис
+-------------------------------------------
+   CITY       RELATION     ORGANIZATION
+Princeton HEADQUARTERED_IN Princeton Tory
+-------------------------------------------
+    CITY        RELATION     STATE_OR_PROVINCE
+Миннеаполис    LOCATED_IN    Миннесота
+===========================================
+COUNTRY     RELATION     DATE
+Израиля  PARTICIPANT_IN  C молодости
+-------------------------------------------
+COUNTRY     RELATION     EVENT
+ Турции  PARTICIPANT_IN  восстановлении Османской империи
+-------------------------------------------
+COUNTRY     RELATION     LAW
+  США       PRODUCES     соглашением по безопасности Европы
+-------------------------------------------
+COUNTRY     RELATION     ORGANIZATION
+ Турции     MEMBER_OF    НАТО
+===========================================
+        CRIME            RELATION     COUNTRY
+военные преступления  TAKES_PLACE_IN  Афганистане
+===========================================
+   EVENT       RELATION     CRIME
+помиловать     HAS_CAUSE    военные преступления
+-------------------------------------------
+       EVENT           RELATION     DATE
+приведён к присяге   POINT_IN_TIME  На следующий день, 25 января 2025 года
+ выборы 2016 года    POINT_IN_TIME  2016 года
+ расторг контракт    POINT_IN_TIME  В том же месяце
+    помиловать       POINT_IN_TIME  В ноябре того же года
+     слушаниях       POINT_IN_TIME  14 января 2025 года
+      выборы         POINT_IN_TIME  2016 года
+===========================================
+    FACILITY        RELATION     FACILITY
+мечеть Аль-Акса    LOCATED_IN    Храмовой горе
+ Третьего Храма    LOCATED_IN    Храмовой горе
+===========================================
+    IDEOLOGY        RELATION     PERSON
+Республиканской     WORKPLACE    Теда Круза
+===========================================
+         LOCATION              RELATION     LOCATION
+Индо-Тихоокеанском регионе    LOCATED_IN    Индо-Тихоокеанском
+    Индо-Тихоокеанском        LOCATED_IN    Индо-Тихоокеанском регионе
+===========================================
+ORDINAL     RELATION     ORGANIZATION
+ втором   AWARDED_WITH   Fox
+  3-го       PART_OF     101-й воздушно-десантной дивизии
+===========================================
+ ORGANIZATION      RELATION     CITY
+Princeton Tory HEADQUARTERED_IN Princeton
+ Седьмой канал HEADQUARTERED_IN иерусалимской
+-------------------------------------------
+   ORGANIZATION       RELATION     COUNTRY
+кабинет министров HEADQUARTERED_IN США
+-------------------------------------------
+ORGANIZATION     RELATION     DATE
+  Fox News    PARTICIPANT_IN  14 июня 2015 года
+-------------------------------------------
+             ORGANIZATION                 RELATION     EVENT
+пехоту Национальной гвардии Миннесоты  PARTICIPANT_IN  призван
+     пехоту Национальной гвардии       PARTICIPANT_IN  призван
+               Fox News                PARTICIPANT_IN  расторг контракт
+                Сенат                       AGENT      проголосовал
+                 НАТО                  PARTICIPANT_IN  восстановлении Османской империи
+-------------------------------------------
+                             ORGANIZATION                                  RELATION     ORGANIZATION
+3-го батальона 187-го пехотного полка 101-й воздушно-десантной дивизии      PART_OF     101-й воздушно-десантной дивизии
+                 Комитетом Сената по вооружённым силам                      PART_OF     Сенат
+                 Комитетом Сената по вооружённым силам                      PART_OF     Сената по вооружённым силам
+                                 Сенат                                      PART_OF     Сената по вооружённым силам
+-------------------------------------------
+     ORGANIZATION          RELATION     PERSON
+Республиканской партии     WORKPLACE    Теда Круза
+-------------------------------------------
+             ORGANIZATION                 RELATION     STATE_OR_PROVINCE
+пехоту Национальной гвардии Миннесоты HEADQUARTERED_IN Миннесоты
+     пехоту Национальной гвардии      HEADQUARTERED_IN Миннесоты
+===========================================
+  PERSON       RELATION     AWARD
+Пит Хегсет   AWARDED_WITH   За заслуги перед армией
+  Хегсет     AWARDED_WITH   За заслуги перед армией
+-------------------------------------------
+  PERSON       RELATION     CITY
+Пит Хегсет  PLACE_OF_BIRTH  Миннеаполис
+  Хегсет    PLACE_OF_BIRTH  Миннеаполис
+  Хегсет   PLACE_RESIDES_IN Миннеаполис
+  Хегсет   SCHOOLS_ATTENDED Принстонского
+-------------------------------------------
+     PERSON         RELATION     COUNTRY
+Дональда Трампа     WORKPLACE    США
+ Дональд Трамп      WORKPLACE    США
+-------------------------------------------
+PERSON     RELATION     CRIME
+Хегсет     WORKS_AS     публичном пьянстве
+Хегсет     WORKS_AS     супружеской неверности
+-------------------------------------------
+           PERSON                RELATION     DATE
+Пи́тер (Пит) Бра́йан Хе́гсет   DATE_OF_BIRTH  6 июня 1980
+     Peter Brian Hegseth       DATE_OF_BIRTH  6 июня 1980
+           Трампа              POINT_IN_TIME  24 января 2025 года
+           Трампа              POINT_IN_TIME  В 2001 году
+           Трампа              POINT_IN_TIME  В 2004—2005 годах
+           Трампа              POINT_IN_TIME  В ноябре 2024 года
+           Трампа              POINT_IN_TIME  в 2013 году
+-------------------------------------------
+PERSON     RELATION     DISEASE
+Хегсет     WORKS_AS     инвалидности
+-------------------------------------------
+    PERSON         RELATION     EVENT
+Клинта Лорэнса  PARTICIPANT_IN  помиловать
+ Дональд Трамп       AGENT      помиловать
+    Хегсета     PARTICIPANT_IN  приведён к присяге
+    Вэнсом           AGENT      приведён к присяге
+    Хегсет           AGENT      расторг контракт
+    Хегсет      PARTICIPANT_IN  конференции
+    Хегсет      PARTICIPANT_IN  призван
+-------------------------------------------
+PERSON     RELATION     IDEOLOGY
+Хегсет    IDEOLOGY_OF   консервативной
+-------------------------------------------
+           PERSON                RELATION     NATIONALITY
+Пи́тер (Пит) Бра́йан Хе́гсет   ORIGINS_FROM   американский
+     Peter Brian Hegseth       ORIGINS_FROM   американский
+-------------------------------------------
+      PERSON           RELATION     ORGANIZATION
+Джона Томпсона III     WORKPLACE    Тигры
+   Питер Хегсет        WORKPLACE    Пентагона
+    Бетси Девос        MEMBER_OF    кабинет министров
+    Пит Хегсет         WORKPLACE    Bear Stearns
+    Пит Хегсет         WORKPLACE    Fox News
+      Хегсета          MEMBER_OF    кабинет министров
+      Хегсет         AWARDED_WITH   Fox
+      Хегсет       SCHOOLS_ATTENDED Принстонского университета
+      Хегсет       SCHOOLS_ATTENDED среднюю школу
+      Хегсет           WORKPLACE    Bear Stearns
+      Хегсет           WORKPLACE    Fox News
+      Хегсет           WORKPLACE    Корпусу подготовки офицеров запаса
+      Хегсет           WORKPLACE    Национальной гвардии
+      Хегсет           WORKPLACE    Тигры
+-------------------------------------------
+   PERSON        RELATION     PERSON
+Питер Хегсет       KNOWS      Дональда Трампа
+Пенни Хегсет     PARENT_OF    Пит Хегсет
+Пенни Хегсет     PARENT_OF    Хегсет
+   Брайана       PARENT_OF    Пит Хегсет
+   Брайана       PARENT_OF    Хегсет
+   Брайана        SPOUSE      Пенни Хегсет
+-------------------------------------------
+       PERSON           RELATION     PROFESSION
+Peter Brian Hegseth     WORKS_AS     телеведущий
+ Джона Томпсона III     WORKS_AS     тренера
+  Дональда Трампа       WORKS_AS     президента США
+  Роберта Мюллера       WORKS_AS     специального прокурора
+   Клинта Лорэнса       WORKS_AS     лейтенанта
+   Джей Ди Вэнса        WORKS_AS     вице-президента
+    Кевин Крамер        WORKS_AS     сенаторов
+    Пенни Хегсет        WORKS_AS     тренера по баскетболу
+    Питер Хегсет        WORKS_AS     Глава Пентагона
+      Брайана           WORKS_AS     тренера
+      Брайана           WORKS_AS     тренера по баскетболу
+       Вэнсом           WORKS_AS     вице-президента
+       Хегсет           WORKS_AS     аналитиком
+       Хегсет           WORKS_AS     аналитиком по рынкам акционерного капитала
+       Хегсет           WORKS_AS     издателем
+       Хегсет           WORKS_AS     командиром пехотного взвода
+       Хегсет           WORKS_AS     офицер
+===========================================
+     PROFESSION          RELATION     COUNTRY
+министра обороны США     WORKPLACE    США
+ Министр обороны США     WORKPLACE    США
+ Министр обороны США     WORKPLACE    США
+   Министр обороны       WORKPLACE    США
+   Министр обороны       WORKPLACE    США
+   президента США        WORKPLACE    США
+-------------------------------------------
+  PROFESSION       RELATION     CRIME
+военнослужащих   CONVICTED_OF   военные преступления
+-------------------------------------------
+  PROFESSION       RELATION     EVENT
+военнослужащих  PARTICIPANT_IN  помиловать
+-------------------------------------------
+ PROFESSION     RELATION     NATIONALITY
+телеведущий   ORIGINS_FROM   американский
+-------------------------------------------
+                PROFESSION                     RELATION     ORGANIZATION
+аналитиком по рынкам акционерного капитала     WORKPLACE    Bear Stearns
+        офицер Национальной гвардии            WORKPLACE    Национальной гвардии
+             ведущим Fox News                  WORKPLACE    Fox News
+              Глава Пентагона                  WORKPLACE    Пентагона
+                аналитиком                     WORKPLACE    Bear Stearns
+                  офицер                       WORKPLACE    Национальной гвардии
+===========================================
+STATE_OR_PROVINCE     RELATION     COUNTRY
+    Миннесота        LOCATED_IN    США
+===========================================
+                             WORK_OF_ART                                 RELATION     DATE
+The War on Warriors: Behind the Betrayal of the Men Who Keep Us Free DATE_OF_CREATION 2024
+  Battle for the American Mind: Uprooting a Century of Miseducation  DATE_OF_CREATION 2022
+           Modern Warriors: Real Stories from Real Heroes            DATE_OF_CREATION 2021
+              American Crusade: Our Fight to Stay Free               DATE_OF_CREATION 2020

@@ -1,0 +1,227 @@
+HEAD -> RELATION -> TAIL
+===========================================
+    CITY         RELATION     CITY
+Форест-Лейке    LOCATED_IN    Миннеаполис
+-------------------------------------------
+CITY     RELATION     COUNTRY
+Киев    LOCATED_IN    Украину
+-------------------------------------------
+   CITY       RELATION     ORGANIZATION
+Princeton HEADQUARTERED_IN Princeton Tory
+-------------------------------------------
+    CITY        RELATION     STATE_OR_PROVINCE
+Миннеаполис    LOCATED_IN    Миннесота
+===========================================
+COUNTRY     RELATION     EVENT
+Украину  PARTICIPANT_IN  Вторжение
+Украину  PARTICIPANT_IN  войне
+Украину  PARTICIPANT_IN  войне против России
+ России  PARTICIPANT_IN  войне
+ России  PARTICIPANT_IN  войне против России
+  ДНР    PARTICIPANT_IN  Вторжение
+-------------------------------------------
+COUNTRY     RELATION     IDEOLOGY
+ Китая     IDEOLOGY_OF   коммунистического
+===========================================
+          CRIME               RELATION     COUNTRY
+фотографирование с трупом  TAKES_PLACE_IN  Ираке
+   военные преступления    TAKES_PLACE_IN  Афганистане
+   военные преступления    TAKES_PLACE_IN  Ираке
+-------------------------------------------
+ CRIME      RELATION     CRIME
+самосуд     HAS_CAUSE    приказ открыть стрельбу по афганским мотоциклистам
+===========================================
+  EVENT       RELATION     COUNTRY
+Вторжение  TAKES_PLACE_IN  Украину
+-------------------------------------------
+   EVENT        RELATION     CRIME
+осуждённого     HAS_CAUSE    приказ открыть стрельбу по афганским мотоциклистам
+осуждённого     HAS_CAUSE    самосуд
+ помиловать     HAS_CAUSE    военные преступления
+ помиловать     HAS_CAUSE    приказ открыть стрельбу по афганским мотоциклистам
+-------------------------------------------
+       EVENT           RELATION     DATE
+получили показания   POINT_IN_TIME  21 января
+ выборы 2016 года    POINT_IN_TIME  2016 года
+ расторг контракт    POINT_IN_TIME  В том же месяце
+    осуждённого      POINT_IN_TIME  в 2012 году
+    помиловать       POINT_IN_TIME  В ноябре того же года
+     слушаниях       POINT_IN_TIME  14 января 2025 года
+      выборах        POINT_IN_TIME  2022 года
+      выборы         POINT_IN_TIME  2016 года
+===========================================
+    IDEOLOGY        RELATION     PERSON
+Республиканской     WORKPLACE    Теда Круза
+===========================================
+ORDINAL     RELATION     ORGANIZATION
+ втором   AWARDED_WITH   Fox
+  3-го       PART_OF     101-й воздушно-десантной дивизии
+===========================================
+ ORGANIZATION      RELATION     CITY
+Princeton Tory HEADQUARTERED_IN Princeton
+ Седьмой канал HEADQUARTERED_IN иерусалимской
+-------------------------------------------
+ORGANIZATION     RELATION     DATE
+  Fox News    PARTICIPANT_IN  14 июня 2015 года
+-------------------------------------------
+             ORGANIZATION                 RELATION     EVENT
+Комитетом Сената по вооружённым силам  PARTICIPANT_IN  слушаниях
+пехоту Национальной гвардии Миннесоты  PARTICIPANT_IN  призван
+     пехоту Национальной гвардии       PARTICIPANT_IN  призван
+            Седьмой канал                 ORGANIZES    конференции
+               Fox News                PARTICIPANT_IN  расторг контракт
+                 ЛНР                   PARTICIPANT_IN  Вторжение
+-------------------------------------------
+                             ORGANIZATION                                  RELATION     ORGANIZATION
+3-го батальона 187-го пехотного полка 101-й воздушно-десантной дивизии      PART_OF     101-й воздушно-десантной дивизии
+                 Комитетом Сената по вооружённым силам                      PART_OF     Сенат
+                 Комитетом Сената по вооружённым силам                      PART_OF     Сената по вооружённым силам
+                                 Сенат                                      PART_OF     Сената по вооружённым силам
+-------------------------------------------
+     ORGANIZATION          RELATION     PERSON
+Республиканской партии     WORKPLACE    Теда Круза
+-------------------------------------------
+             ORGANIZATION                 RELATION     STATE_OR_PROVINCE
+пехоту Национальной гвардии Миннесоты HEADQUARTERED_IN Миннесоты
+     пехоту Национальной гвардии      HEADQUARTERED_IN Миннесоты
+===========================================
+  PERSON       RELATION     AWARD
+Пит Хегсет   AWARDED_WITH   За заслуги перед армией
+  Хегсет     AWARDED_WITH   За заслуги перед армией
+-------------------------------------------
+  PERSON       RELATION     CITY
+Пит Хегсет  PLACE_OF_BIRTH  Миннеаполис
+  Хегсет    PLACE_OF_BIRTH  Миннеаполис
+  Хегсет   PLACE_RESIDES_IN Миннеаполис
+  Хегсет   SCHOOLS_ATTENDED Принстонского
+-------------------------------------------
+     PERSON         RELATION     COUNTRY
+Дональда Трампа     WORKPLACE    США
+-------------------------------------------
+      PERSON          RELATION     CRIME
+Эдварда Галлахера   CONVICTED_OF   фотографирование с трупом
+Эдварда Галлахера  PARTICIPANT_IN  фотографирование с трупом
+ Мэтью Голштейна    CONVICTED_OF   самосуд
+  Лиза Меркауски      HAS_CAUSE    сексуальном насилии
+      Хегсет        CONVICTED_OF   публичном пьянстве
+      Хегсет        CONVICTED_OF   сексуального насилия
+      Хегсет        CONVICTED_OF   сексуального насилия в наших вооружённых силах
+      Хегсет        CONVICTED_OF   сексуальном насилии
+      Хегсет        CONVICTED_OF   супружеской неверности
+-------------------------------------------
+           PERSON                RELATION     DATE
+Пи́тер (Пит) Бра́йан Хе́гсет   DATE_OF_BIRTH  6 июня 1980
+     Peter Brian Hegseth       DATE_OF_BIRTH  6 июня 1980
+       Клинта Лорэнса             AGE_IS      19 лет
+       Лиза Меркауски          POINT_IN_TIME  12 ноября 2024 года
+         Бетси Девос           POINT_IN_TIME  12 ноября 2024 года
+         Бетси Девос           POINT_IN_TIME  14 января 2025 года
+         Бетси Девос           POINT_IN_TIME  21 января
+         Бетси Девос           POINT_IN_TIME  В том же месяце
+         Бетси Девос           POINT_IN_TIME  Несколько дней спустя
+         Бетси Девос           POINT_IN_TIME  в 2017 году
+           Трампа              POINT_IN_TIME  24 января 2025 года
+           Трампа              POINT_IN_TIME  В 2001 году
+           Трампа              POINT_IN_TIME  В 2004—2005 годах
+           Трампа              POINT_IN_TIME  В ноябре 2024 года
+           Трампа              POINT_IN_TIME  в 2013 году
+-------------------------------------------
+PERSON     RELATION     DISEASE
+Хегсет     WORKS_AS     инвалидности
+-------------------------------------------
+      PERSON          RELATION     EVENT
+Эдварда Галлахера  PARTICIPANT_IN  восстановил в звании
+ Дональда Трампа        AGENT      помиловать
+ Мэтью Голштейна   PARTICIPANT_IN  восстановил в звании
+  Клинта Лорэнса   PARTICIPANT_IN  осуждённого
+  Клинта Лорэнса   PARTICIPANT_IN  помиловать
+  Дональд Трамп         AGENT      помиловать
+     Даниэль       PARTICIPANT_IN  получили показания
+      Хегсет            AGENT      расторг контракт
+      Хегсет       PARTICIPANT_IN  конференции
+      Хегсет       PARTICIPANT_IN  призван
+      Хегсет       PARTICIPANT_IN  слушаниях
+-------------------------------------------
+   PERSON        RELATION     IDEOLOGY
+Пита Хегсета    IDEOLOGY_OF   демократов
+   Хегсет       IDEOLOGY_OF   консервативной
+-------------------------------------------
+           PERSON                RELATION     NATIONALITY
+Пи́тер (Пит) Бра́йан Хе́гсет   ORIGINS_FROM   американский
+     Peter Brian Hegseth       ORIGINS_FROM   американский
+-------------------------------------------
+      PERSON           RELATION     ORGANIZATION
+Джона Томпсона III     WORKPLACE    Тигры
+   Питер Хегсет        WORKPLACE    Пентагона
+    Пит Хегсет         WORKPLACE    Bear Stearns
+    Пит Хегсет         WORKPLACE    Fox News
+      Хегсет         AWARDED_WITH   Fox
+      Хегсет       SCHOOLS_ATTENDED Принстонского университета
+      Хегсет       SCHOOLS_ATTENDED среднюю школу
+      Хегсет           WORKPLACE    Bear Stearns
+      Хегсет           WORKPLACE    Fox News
+      Хегсет           WORKPLACE    Корпусу подготовки офицеров запаса
+      Хегсет           WORKPLACE    Национальной гвардии
+      Хегсет           WORKPLACE    Тигры
+-------------------------------------------
+   PERSON        RELATION     PERSON
+Питер Хегсет       KNOWS      Дональда Трампа
+Пенни Хегсет     PARENT_OF    Пит Хегсет
+Пенни Хегсет     PARENT_OF    Хегсет
+   Брайана       PARENT_OF    Пит Хегсет
+   Брайана       PARENT_OF    Хегсет
+   Брайана        SPOUSE      Пенни Хегсет
+   Хегсет      CONVICTED_OF   Митч Макконнелл
+-------------------------------------------
+       PERSON           RELATION     PROFESSION
+Peter Brian Hegseth     WORKS_AS     телеведущий
+ Джона Томпсона III     WORKS_AS     тренера
+  Мэтью Голштейна       WORKS_AS     майора
+  Роберта Мюллера       WORKS_AS     специального прокурора
+   Клинта Лорэнса       WORKS_AS     военнослужащих
+   Клинта Лорэнса       WORKS_AS     лейтенанта
+    Кевин Крамер        WORKS_AS     сенаторов
+    Пенни Хегсет        WORKS_AS     тренера по баскетболу
+    Питер Хегсет        WORKS_AS     Глава Пентагона
+      Брайана           WORKS_AS     тренера
+      Брайана           WORKS_AS     тренера по баскетболу
+       Хегсет           WORKS_AS     аналитиком
+       Хегсет           WORKS_AS     аналитиком по рынкам акционерного капитала
+       Хегсет           WORKS_AS     издателем
+       Хегсет           WORKS_AS     командиром пехотного взвода
+       Хегсет           WORKS_AS     офицер
+===========================================
+     PROFESSION         RELATION     COUNTRY
+Министр обороны США     WORKPLACE    США
+Министр обороны США     WORKPLACE    США
+  Министр обороны       WORKPLACE    США
+  Министр обороны       WORKPLACE    США
+   мотоциклистам      ORIGINS_FROM   афганским
+-------------------------------------------
+  PROFESSION       RELATION     CRIME
+военнослужащих   CONVICTED_OF   военные преступления
+ мотоциклистам  PARTICIPANT_IN  приказ открыть стрельбу по афганским мотоциклистам
+ мотоциклистам  PARTICIPANT_IN  самосуд
+-------------------------------------------
+  PROFESSION       RELATION     EVENT
+военнослужащих  PARTICIPANT_IN  помиловать
+   сенаторов    PARTICIPANT_IN  получили показания
+-------------------------------------------
+ PROFESSION     RELATION     NATIONALITY
+телеведущий   ORIGINS_FROM   американский
+-------------------------------------------
+                PROFESSION                     RELATION     ORGANIZATION
+аналитиком по рынкам акционерного капитала     WORKPLACE    Bear Stearns
+        офицер Национальной гвардии            WORKPLACE    Национальной гвардии
+             ведущим Fox News                  WORKPLACE    Fox News
+              Глава Пентагона                  WORKPLACE    Пентагона
+                аналитиком                     WORKPLACE    Bear Stearns
+                  офицер                       WORKPLACE    Национальной гвардии
+===========================================
+STATE_OR_PROVINCE     RELATION     COUNTRY
+    Миннесота        LOCATED_IN    США
+===========================================
+                             WORK_OF_ART                                 RELATION     DATE
+The War on Warriors: Behind the Betrayal of the Men Who Keep Us Free DATE_OF_CREATION 2024
+  Battle for the American Mind: Uprooting a Century of Miseducation  DATE_OF_CREATION 2022
+           Modern Warriors: Real Stories from Real Heroes            DATE_OF_CREATION 2021

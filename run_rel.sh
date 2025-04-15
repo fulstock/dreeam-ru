@@ -6,7 +6,7 @@ python3 run.py --do_train \
     --save_path ./logs/seccol-test2 \
     --train_file train.json \
     --dev_file test.json \
-    --train_batch_size 1 \
+    --train_batch_size 16 \
     --test_batch_size 1 \
     --gradient_accumulation_steps 1 \
     --num_labels 2 \

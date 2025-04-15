@@ -38,9 +38,9 @@ def load_input(batch, device, tag="dev"):
 
     return input
 
-def train(args, model, train_features, dev_features):
+def train(args, model, train_features, dev_features, id2rel):
 
-    def finetune(features, optimizer, num_epoch, num_steps):
+    def finetune(features, optimizer, num_epoch, num_steps, id2rel):
         best_score = -1
         train_dataloader = DataLoader(features, batch_size=args.train_batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True)
         train_iterator = range(int(num_epoch))
@@ -122,7 +122,7 @@ def train(args, model, train_features, dev_features):
     num_steps = 0
     set_seed(args)
     model.zero_grad()
-    finetune(train_features, optimizer, args.num_train_epochs, num_steps)
+    finetune(train_features, optimizer, args.num_train_epochs, num_steps, id2rel)
 
 def evaluate(args, model, features, id2rel, tag="dev"):
     
@@ -293,7 +293,7 @@ def main():
         train_features = read(args.data_dir, train_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length, teacher_sig_path=args.teacher_sig_path)
         dev_features = read(args.data_dir, dev_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length)
 
-        train(args, model, train_features, dev_features)
+        train(args, model, train_features, dev_features, id2rel)
 
     else:  # Testing
 

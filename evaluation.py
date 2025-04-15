@@ -243,7 +243,7 @@ def gen_train_facts(data_file_name, truth_dir):
         return fact_in_train
 
     fact_in_train = set([])
-    ori_data = json.load(open(data_file_name))
+    ori_data = json.load(open(data_file_name, "r", encoding = "UTF-8"))
     for data in ori_data:
         vertexSet = data['vertexSet']
         for label in data['labels']:

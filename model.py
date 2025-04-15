@@ -1,6 +1,4 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]=""
-
 import torch
 import torch.nn as nn
 from opt_einsum import contract

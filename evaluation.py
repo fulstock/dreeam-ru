@@ -4,8 +4,7 @@ import json
 import numpy as np
 from tqdm import tqdm
 
-rel2id = json.load(open('meta/rel2id.json', 'r'))
-id2rel = {value: key for key, value in rel2id.items()}
+
 
 def get_title2pred(pred: list) -> dict:
     '''
@@ -35,7 +34,7 @@ def get_title2pred(pred: list) -> dict:
     return title2pred
 
 
-def get_title2gt(features: dict) -> dict:
+def get_title2gt(features: dict, id2rel: dict) -> dict:
     '''
     Convert ground-truth labels to dictionary.
     Input:
@@ -43,6 +42,8 @@ def get_title2gt(features: dict) -> dict:
     Output:
         :title2gt: dictionary with (key, value) = (title, [gold_triples])
     '''
+
+
     title2gt = {}
     for f in features:
         title = f["title"]
@@ -88,7 +89,7 @@ def select_thresh(cand: list, num_gt: int, correct: int, num_pred: int):
     return thresh, sorted_pred[:f1_pos + 1]
 
 
-def merge_results(pred: list, pred_pseudo: list, features: list, thresh: float = None):
+def merge_results(id2rel: dict, pred: list, pred_pseudo: list, features: list, thresh: float = None):
     '''
     Merge relation predictions from the original document and psuedo documents.
     Input:
@@ -108,7 +109,7 @@ def merge_results(pred: list, pred_pseudo: list, features: list, thresh: float =
 
     print(title2pred.keys())
 
-    title2gt = get_title2gt(features)
+    title2gt = get_title2gt(features, id2rel)
     num_gt = sum([len(title2gt[t]) for t in title2gt])
 
     print(title2gt.keys())
@@ -170,7 +171,7 @@ def extract_relative_score(scores: list, topks: list) -> list:
 
     return scores
 
-def to_official(preds: list, features: list, evi_preds: list = [], scores: list = [], topks: list = []):
+def to_official(id2rel: dict, preds: list, features: list, evi_preds: list = [], scores: list = [], topks: list = []):
     '''
     Convert the predictions to official format for evaluating.
     Input:

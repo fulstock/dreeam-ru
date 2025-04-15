@@ -1,0 +1,1 @@
+python3.10 run.py --data_dir other/split --transformer_type bert --model_name_or_path DeepPavlov/rubert-base-cased --display_name test5_inf --load_path ./logs/test2/2025-03-25_12-51-58.190678 --eval_mode single --test_file test.json --test_batch_size 1 --num_labels 2 --num_class 50 --evi_thresh 0.2 --max_seq_length 1600 --max_sent_num 101

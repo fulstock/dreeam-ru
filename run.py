@@ -124,7 +124,7 @@ def train(args, model, train_features, dev_features):
     model.zero_grad()
     finetune(train_features, optimizer, args.num_train_epochs, num_steps)
 
-def evaluate(args, model, features, tag="dev"):
+def evaluate(args, model, features, id2rel, tag="dev"):
     
     dataloader = DataLoader(features, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False)
     preds, evi_preds = [], []
@@ -169,7 +169,7 @@ def evaluate(args, model, features, tag="dev"):
     if evi_preds != []:
         evi_preds = np.concatenate(evi_preds, axis=0)
     
-    official_results, results = to_official(preds, features, evi_preds = evi_preds, scores = scores, topks = topks)
+    official_results, results = to_official(id2rel, preds, features, evi_preds = evi_preds, scores = scores, topks = topks)
     
     if len(official_results) > 0:
         if tag == "test":
@@ -244,6 +244,12 @@ def main():
     args.n_gpu = torch.cuda.device_count()
     args.device = device
 
+    print(device)
+    print(torch.cuda.device_count())
+
+    rel2id = json.load(open(os.path.join(args.data_dir, 'rel2id.json'), 'r'))
+    id2rel = {value: key for key, value in rel2id.items()}
+
     config = AutoConfig.from_pretrained(
         args.config_name if args.config_name else args.model_name_or_path,
         num_labels=args.num_class,
@@ -300,7 +306,7 @@ def main():
         
         if args.eval_mode != "fushion":
 
-            test_scores, test_output, official_results, results = evaluate(args, model, test_features, tag="test")   
+            test_scores, test_output, official_results, results = evaluate(args, model, test_features, id2rel, tag="test")   
             wandb.log(test_scores)
 
             offi_path = os.path.join(args.load_path, args.pred_file)
@@ -317,7 +323,7 @@ def main():
             pseudo_test_features = read(args.data_dir, test_file, tokenizer, max_seq_length=args.max_seq_length, single_results = results)
             
         
-            pseudo_test_scores, pseudo_output, pseudo_official_results, pseudo_results = evaluate(args, model, pseudo_test_features, tag="test")
+            pseudo_test_scores, pseudo_output, pseudo_official_results, pseudo_results = evaluate(args, model, pseudo_test_features, id2rel, tag="test")
 
             if 'thresh' in os.listdir(args.load_path):
                 with open(os.path.join(args.load_path, "thresh")) as f:
@@ -326,7 +332,7 @@ def main():
             else:
                 thresh = None
             
-            merged_offi, thresh = merge_results(results, pseudo_results, test_features, thresh)
+            merged_offi, thresh = merge_results(id2rel, results, pseudo_results, test_features, thresh)
             if args.do_train:
                 merged_re, merged_evi, merged_re_ign, _ = official_evaluate(merged_offi, args.data_dir, args.train_file, args.test_file)
             else:

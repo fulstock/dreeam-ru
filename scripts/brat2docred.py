@@ -62,7 +62,8 @@ rel2id["Na"] = 0
 
 for rel_id, rel_tag in enumerate(rel_tags[1:]):
     rel_info["P" + str(rel_id + 1)] = rel_tag
-    rel2id["P" + str(rel_id + 1)] = rel_id
+    # rel2id["P" + str(rel_id + 1)] = rel_id
+    rel2id[rel_tag] = rel_id + 1
     rel_info_inv[rel_tag] = "P" + str(rel_id + 1)
 
 with open(os.path.join(docred_output_path, "rel_info.json"), "w") as rel_info_file:
@@ -76,9 +77,11 @@ ner2id = {tag : tid for tid, tag in enumerate(ner_tags)}
 with open(os.path.join(docred_output_path, "ner2id.json"), "w") as ner2id_file:
     json.dump(ner2id, ner2id_file, ensure_ascii = False)
 
-# sets = ["train", "dev", "test"]
+#sets = ["train", "dev", "test"]
 
-sets = [""]
+sets = ["train", "test"]
+
+#sets = [""]
 
 for ds in sets:
 
@@ -318,12 +321,20 @@ for ds in sets:
                             total_relations_errors_count += 1
                             continue
                         total_relations_count += 1
-                        doc_data["labels"].append({
-                            "r" : rel_type,
-                            "h" : head_id,
-                            "t" : tail_id,
-                            "evidence" : sorted(list(evidences))
-                        })
+                        same_relations = [(l_idx, l) for l_idx, l in enumerate(doc_data["labels"]) if l["r"] == rel_type and l["h"] == head_id and l["t"] == tail_id]
+                        assert len(same_relations) <= 1
+                        if len(same_relations) > 0:
+                            l_idx = same_relations[0][0]
+                            ev = set(doc_data["labels"][l_idx]["evidence"])
+                            ev.update(evidences)
+                            doc_data["labels"][l_idx]["evidence"] = sorted(list(ev))
+                        else:
+                            doc_data["labels"].append({
+                                "r" : rel_type,
+                                "h" : head_id,
+                                "t" : tail_id,
+                                "evidence" : sorted(list(evidences))
+                            })
 
                     docs_data.append(doc_data)
 

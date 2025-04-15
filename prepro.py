@@ -4,9 +4,6 @@ import numpy as np
 import pickle
 import os
 
-docred_rel2id = json.load(open('meta/rel2id.json', 'r'))
-docred_ent2id = json.load(open('meta/ner2id.json', 'r'))
-
 def add_entity_markers(sample, tokenizer, entity_start, entity_end):
     ''' add entity marker (*) at the end and beginning of entities. '''
 
@@ -132,7 +129,8 @@ def get_pseudo_features(raw_feature: dict, pred_rels: list, entities: list, sent
 
     return pseudo_features, pos_samples, neg_samples
 
-def read_docred(file_in, 
+def read_docred(dataset_dir,
+                file_in, 
                 tokenizer, 
                 transformer_type="bert",
                 max_seq_length=1024, 
@@ -142,6 +140,8 @@ def read_docred(file_in,
     pos_samples = 0
     neg_samples = 0
     features = []
+
+    docred_rel2id = json.load(open(os.path.join(dataset_dir, 'rel2id.json'), 'r'))
 
     if file_in == "":
         return None
@@ -232,10 +232,12 @@ def read_docred(file_in,
             sent_labels.append(sent_evi)
             pos_samples += 1
 
+        # print(len(relations), len(entities))
+
         for h in range(len(entities)):
             for t in range(len(entities)):
                 # all entity pairs that do not have relation are treated as negative samples
-                if h != t and [h, t] not in hts: #and [t, h] not in hts:
+                if [h, t] not in hts: #and [t, h] not in hts:
                     relation = [1] + [0] * (len(docred_rel2id) - 1)
                     sent_evi = [0] * len(sent_pos)
                     relations.append(relation)
@@ -243,9 +245,13 @@ def read_docred(file_in,
                     hts.append([h, t])
                     sent_labels.append(sent_evi)
                     neg_samples += 1
-                    
-        assert len(relations) <= len(entities) * (len(entities) - 1) + 1
-        assert len(relations) >= len(entities) * (len(entities) - 1) 
+        # print(docred_rel2id)
+        # print(len(relations), len(entities))
+        # print(entities)
+        # print(relations)
+        # print(entities)
+        assert len(relations) <= len(entities) * len(entities) + 1
+        assert len(relations) >= len(entities) * len(entities) 
         # assert len(sents) < max_seq_length
         if len(sents) > max_seq_length:
           print(f'Warning: len(sent): {len(sents)} > max_seq_length {max_seq_length}')

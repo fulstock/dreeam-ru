@@ -284,8 +284,8 @@ def main():
         train_file = os.path.join(args.data_dir, args.train_file)
         dev_file = os.path.join(args.data_dir, args.dev_file)
 
-        train_features = read(train_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length, teacher_sig_path=args.teacher_sig_path)
-        dev_features = read(dev_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length)
+        train_features = read(args.data_dir, train_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length, teacher_sig_path=args.teacher_sig_path)
+        dev_features = read(args.data_dir, dev_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length)
 
         train(args, model, train_features, dev_features)
 
@@ -294,7 +294,7 @@ def main():
         basename = os.path.splitext(args.test_file)[0]
         test_file = os.path.join(args.data_dir, args.test_file)
         
-        test_features = read(test_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length)
+        test_features = read(args.data_dir, test_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length)
 
         # print(test_features[0]['sent_labels'])
         
@@ -314,7 +314,7 @@ def main():
             results = json.load(open(os.path.join(args.load_path, f"topk_{args.pred_file}")))
 
             # formulate pseudo documents from top-k (k=num_labels in arguments) predictions
-            pseudo_test_features = read(test_file, tokenizer, max_seq_length=args.max_seq_length, single_results = results)
+            pseudo_test_features = read(args.data_dir, test_file, tokenizer, max_seq_length=args.max_seq_length, single_results = results)
             
         
             pseudo_test_scores, pseudo_output, pseudo_official_results, pseudo_results = evaluate(args, model, pseudo_test_features, tag="test")

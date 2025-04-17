@@ -15,9 +15,9 @@ python3 run.py --do_train \
     --evi_thresh 0.2 \
     --evi_lambda 0.05 \
     --warmup_ratio 0.06 \
-    --num_train_epochs 1 \
+    --num_train_epochs 100 \
     --seed 42 \
     --num_class 7 \
     --max_seq_length 1500 \
-    --max_sent_num 101\
+    --max_sent_num 101 \
     --eval_mode single

@@ -41,7 +41,7 @@ def load_input(batch, device, tag="dev"):
 def train(args, model, train_features, dev_features, id2rel):
 
     def finetune(features, optimizer, num_epoch, num_steps, id2rel):
-        best_score = -1
+        best_score = 0
         train_dataloader = DataLoader(features, batch_size=args.train_batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True)
         train_iterator = range(int(num_epoch))
         total_steps = int(len(train_dataloader) * num_epoch // args.gradient_accumulation_steps)
@@ -80,6 +80,8 @@ def train(args, model, train_features, dev_features, id2rel):
                     num_steps += 1
                     
                 wandb.log(outputs["loss"], step=num_steps)
+
+                best_offi_results = None
                 
                 if (step + 1) == len(train_dataloader) or (args.evaluation_steps > 0 and num_steps % args.evaluation_steps == 0 and step % args.gradient_accumulation_steps == 0):
                     
@@ -107,6 +109,10 @@ def train(args, model, train_features, dev_features, id2rel):
                         score_file = os.path.join(args.save_path, "scores.csv")
                         results_file = os.path.join(args.save_path, f"topk_{args.pred_file}")
 
+                        if not best_offi_results:
+                            best_offi_results = official_results
+                            best_output = dev_output
+                            best_results = results
                         dump_to_file(best_offi_results, pred_file, best_output, score_file, best_results, results_file)
                      
 
@@ -176,11 +182,11 @@ def evaluate(args, model, features, id2rel, tag="dev"):
             if args.do_train and args.train_file:
                 best_re, best_evi, best_re_ign, _ = official_evaluate(official_results, args.data_dir, args.train_file, args.test_file)
             else:
-                best_re = best_evi = best_re_ign = [-1, -1, -1]
+                best_re = best_evi = best_re_ign = [0, 0, 0]
         else:
             best_re, best_evi, best_re_ign, _ = official_evaluate(official_results, args.data_dir, args.train_file, args.dev_file)
     else:
-        best_re = best_evi = best_re_ign = [-1, -1, -1]
+        best_re = best_evi = best_re_ign = [0, 0, 0]
     output = {
         tag + "_rel": [i * 100 for i in best_re],
         tag + "_rel_ign": [i * 100 for i in best_re_ign], 
@@ -336,7 +342,7 @@ def main():
             if args.do_train:
                 merged_re, merged_evi, merged_re_ign, _ = official_evaluate(merged_offi, args.data_dir, args.train_file, args.test_file)
             else:
-                merged_re = merged_evi = merged_re_ign = [-1, -1, -1]
+                merged_re = merged_evi = merged_re_ign = [0, 0, 0]
             
             tag = args.test_file.split('.')[0]
             merged_output = {

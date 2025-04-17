@@ -3,7 +3,7 @@ import os
 from tqdm.auto import tqdm
 
 results_json_path = "S:/HRCode/relations/alexey/results.json"
-docred_test_path = "S:/HRCode/data/relations/seccol-div-docred/test.json"
+docred_test_path = "S:/HRCode/data/relations/seccol/div-noalt-docred/test.json"
 
 save_view_path = "S:/HRCode/relations/alexey/test/seccol-div-docred/results_view.txt"
 save_view_dir = '/'.join(save_view_path.split('/')[:-1])

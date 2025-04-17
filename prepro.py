@@ -218,11 +218,14 @@ def read_docred(dataset_dir,
 
         relations, hts, sent_labels = [], [], []
 
+        # print(docred_rel2id)
+
         for h, t in train_triple.keys(): # for every entity pair with gold relation
             relation = [0] * len(docred_rel2id)
             sent_evi = [0] * len(sent_pos)
 
             for mention in train_triple[h, t]: # for each relation mention with head h and tail t
+                # print(mention)
                 relation[mention["relation"]] = 1
                 for i in mention["evidence"]:
                     sent_evi[i] += 1
@@ -237,7 +240,7 @@ def read_docred(dataset_dir,
         for h in range(len(entities)):
             for t in range(len(entities)):
                 # all entity pairs that do not have relation are treated as negative samples
-                if [h, t] not in hts: #and [t, h] not in hts:
+                if h != t and [h, t] not in hts: #and [t, h] not in hts:
                     relation = [1] + [0] * (len(docred_rel2id) - 1)
                     sent_evi = [0] * len(sent_pos)
                     relations.append(relation)
@@ -250,8 +253,8 @@ def read_docred(dataset_dir,
         # print(entities)
         # print(relations)
         # print(entities)
-        assert len(relations) <= len(entities) * len(entities) + 1
-        assert len(relations) >= len(entities) * len(entities) 
+        assert len(relations) <= len(entities) * (len(entities) - 1) + 1
+        assert len(relations) >= len(entities) * (len(entities) - 1)
         # assert len(sents) < max_seq_length
         if len(sents) > max_seq_length:
           print(f'Warning: len(sent): {len(sents)} > max_seq_length {max_seq_length}')

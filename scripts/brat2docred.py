@@ -60,7 +60,7 @@ rel2id = {}
 
 rel2id["Na"] = 0
 
-for rel_id, rel_tag in enumerate(rel_tags[1:]):
+for rel_id, rel_tag in enumerate([r for r in rel_tags[1:] if r != "ALTERNATIVE_NAME"]):
     rel_info["P" + str(rel_id + 1)] = rel_tag
     # rel2id["P" + str(rel_id + 1)] = rel_id
     rel2id[rel_tag] = rel_id + 1
@@ -305,6 +305,9 @@ for ds in sets:
                     total_entity_vertex_count += len(unique_entity_mentions)
 
                     for rel_type, head_mention_id, tail_mention_id in zip(relation_types, head_mentions_ids, tail_mentions_ids):
+
+                        if rel_type == "ALTERNATIVE_NAME":
+                            continue
 
                         evidences = set()
                         head_id = -1

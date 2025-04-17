@@ -2,10 +2,10 @@ import json
 import os
 from tqdm.auto import tqdm
 
-results_json_path = "./alexey/dreeam/logs/test3/2025-03-29_04-31-03.296161/results.json"
-docred_test_path = "./other/test/split/test.json"
+results_json_path = "S:/HRCode/relations/alexey/results.json"
+docred_test_path = "S:/HRCode/data/relations/seccol-div-docred/test.json"
 
-save_view_path = "./other/test/split/results_view.txt"
+save_view_path = "S:/HRCode/relations/alexey/test/seccol-div-docred/results_view.txt"
 save_view_dir = '/'.join(save_view_path.split('/')[:-1])
 
 if not os.path.exists(save_view_dir):

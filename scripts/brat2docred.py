@@ -419,6 +419,8 @@ for ds in sets:
                                     if mention["mention_id"] == tail_mention_id:
                                         tail_id = entity_id
                                         evidences.add(mention["sent_id"])
+                            if head_id == tail_id:
+                                continue
                             
                             total_relations_count += 1
                             same_relations = [(l_idx, l) for l_idx, l in enumerate(doc_datas[part]["labels"]) if l["r"] == rel_type and l["h"] == head_id and l["t"] == tail_id]

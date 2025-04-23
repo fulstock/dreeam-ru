@@ -251,8 +251,8 @@ def read_docred(dataset_dir,
                     sent_labels.append(sent_evi)
                     neg_samples += 1
         # print(docred_rel2id)
-        print(len(relations), len(entities))
-        print(data[doc_id]["title"])
+        # print(len(relations), len(entities))
+        # print(data[doc_id]["title"])
         # print(entities)
         # print(relations)
         # print(entities)

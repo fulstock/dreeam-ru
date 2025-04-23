@@ -1,11 +1,12 @@
 python3 run.py --do_train \
-    --data_dir $HOME/data/relations/seccol-div-docred \
+    --data_dir $HOME/data/relations/NEREL/naa-docred-split \
     --transformer_type bert \
     --model_name_or_path DeepPavlov/rubert-base-cased \
-    --display_name seccol-test2 \
-    --save_path ./logs/seccol-test2 \
+    --display_name nerel-test03 \
+    --save_path ./logs/nerel-test03 \
     --train_file train.json \
-    --dev_file test.json \
+    --dev_file dev.json \
+    --test_file test.json \
     --train_batch_size 16 \
     --test_batch_size 1 \
     --gradient_accumulation_steps 1 \
@@ -15,9 +16,9 @@ python3 run.py --do_train \
     --evi_thresh 0.2 \
     --evi_lambda 0.05 \
     --warmup_ratio 0.06 \
-    --num_train_epochs 100 \
+    --num_train_epochs 1 \
     --seed 42 \
-    --num_class 7 \
-    --max_seq_length 1500 \
+    --num_class 50 \
+    --max_seq_length 1000 \
     --max_sent_num 101 \
     --eval_mode single

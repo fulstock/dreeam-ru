@@ -141,6 +141,8 @@ def read_docred(dataset_dir,
     neg_samples = 0
     features = []
 
+    max_len = 0
+
     docred_rel2id = json.load(open(os.path.join(dataset_dir, 'rel2id.json'), 'r'))
 
     if file_in == "":
@@ -259,6 +261,8 @@ def read_docred(dataset_dir,
         assert len(relations) <= len(entities) * (len(entities) - 1) + 1
         assert len(relations) >= len(entities) * (len(entities) - 1)
         # assert len(sents) < max_seq_length
+        if max_len < len(sents):
+            max_len = len(sents)
         if len(sents) > max_seq_length:
           print(f'Warning: len(sent): {len(sents)} > max_seq_length {max_seq_length}')
         sents = sents[:max_seq_length - 2] # truncate, -2 for [CLS] and [SEP]
@@ -297,6 +301,8 @@ def read_docred(dataset_dir,
     else:        
         print("# of positive examples {}.".format(pos_samples))
         print("# of negative examples {}.".format(neg_samples))
+
+    print("Maximum length: ", max_len)
 
     return features
 

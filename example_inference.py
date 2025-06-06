@@ -15,29 +15,21 @@ def main():
     """Main function demonstrating DreeamInference usage."""
     
     # Initialize the inference model
-    # Check for available models and prefer nerel-ckpt
-    logs_dir = "./logs"
-    if os.path.exists(logs_dir):
-        available_models = [d for d in os.listdir(logs_dir) 
-                          if os.path.isdir(os.path.join(logs_dir, d))]
-        
-        # Prefer nerel-ckpt if available, otherwise use first available
-        if "nerel-ckpt" in available_models:
-            model_path = os.path.join(logs_dir, "nerel-ckpt")
-        elif available_models:
-            model_path = os.path.join(logs_dir, available_models[0])
-            print(f"Available models: {available_models}")
-            print(f"Using: {model_path}")
+    # Use config file - model path is now specified in the config
+    config_path = "./nerel-config.json"
+    if not os.path.exists(config_path):
+        # Try alternative config files
+        alternative_configs = ["./dreeam-config.json", "./config.json"]
+        for alt_config in alternative_configs:
+            if os.path.exists(alt_config):
+                config_path = alt_config
+                break
         else:
-            raise FileNotFoundError(f"No models found in {logs_dir}")
-    else:
-        raise FileNotFoundError(f"Logs directory {logs_dir} not found")
+            raise FileNotFoundError(f"Configuration file not found. Tried: {[config_path] + alternative_configs}")
     
     inference = DreeamInference(
-        model_path=model_path,
-        config_path="./dreeam-config.json",
-        device="auto",
-        batch_size=4
+        config_path=config_path,
+        device="auto"
     )
     
     print("Model loaded successfully!")
@@ -154,9 +146,9 @@ if __name__ == "__main__":
     except FileNotFoundError as e:
         print(f"Error: {e}")
         print("\nMake sure to:")
-        print("1. Update the model_path in the script to point to your trained model")
-        print("2. Ensure the dreeam-config.json file exists")
-        print("3. Ensure the rel2id.json file exists in the data directory")
+        print("1. Ensure the configuration file (nerel-config.json) exists and has the correct model_path")
+        print("2. Ensure the model checkpoint directory exists at the specified model_path")
+        print("3. Ensure the rel2id.json file exists at the path specified in the config")
     except Exception as e:
         print(f"Error during inference: {e}")
         import traceback

@@ -21,34 +21,15 @@ class DreeamInference:
     """
     
     def __init__(self, 
-                 model_path: str,
-                 config_path: str = None,
-                 device: str = "auto",
-                 max_seq_length: int = 1024,
-                 max_sent_num: int = 25,
-                 evi_thresh: float = 0.2,
-                 num_labels: int = 4,
-                 batch_size: int = 8):
+                 config_path: str,
+                 device: str = "auto"):
         """
         Initialize the DREEAM inference model.
         
         Args:
-            model_path: Path to the trained model checkpoint directory
-            config_path: Path to configuration file (optional, will look for dreeam-config.json)
+            config_path: Path to configuration file
             device: Device to run inference on ("auto", "cuda", "cpu")
-            max_seq_length: Maximum sequence length for input
-            max_sent_num: Maximum number of sentences per document
-            evi_thresh: Evidence threshold for sentence selection
-            num_labels: Maximum number of relation labels per entity pair
-            batch_size: Batch size for inference
         """
-        
-        self.model_path = model_path
-        self.max_seq_length = max_seq_length
-        self.max_sent_num = max_sent_num
-        self.evi_thresh = evi_thresh
-        self.num_labels = num_labels
-        self.batch_size = batch_size
         
         # Set device
         if device == "auto":
@@ -57,21 +38,36 @@ class DreeamInference:
             self.device = torch.device(device)
         
         # Load configuration
-        if config_path is None:
-            config_path = os.path.join(model_path, "dreeam-config.json")
-            if not os.path.exists(config_path):
-                config_path = "dreeam-config.json"
-        
-        if os.path.exists(config_path):
-            with open(config_path, 'r', encoding='utf-8') as f:
-                self.config_data = json.load(f)
-        else:
+        if not os.path.exists(config_path):
             raise FileNotFoundError(f"Configuration file not found: {config_path}")
         
+        with open(config_path, 'r', encoding='utf-8') as f:
+            self.config_data = json.load(f)
+        
+        # Extract configuration parameters
+        self.model_path = self.config_data.get("model_path", "./logs/nerel-ckpt")
+        self.max_seq_length = self.config_data.get("max_seq_length", 1024)
+        self.max_sent_num = self.config_data.get("max_sent_num", 25)
+        self.evi_thresh = self.config_data.get("evi_thresh", 0.2)
+        self.num_labels = self.config_data.get("num_labels", 4)
+        self.batch_size = self.config_data.get("batch_size", 8)
+        
         # Load relation mappings
-        rel2id_path = os.path.join(os.path.dirname(config_path), "rel2id.json")
+        rel2id_path = self.config_data.get("rel2id", "rel2id.json")
+        if not os.path.isabs(rel2id_path):
+            rel2id_path = os.path.join(os.path.dirname(config_path), rel2id_path)
+        
         if not os.path.exists(rel2id_path):
-            rel2id_path = os.path.join(self.config_data.get("data_dir", "."), "rel2id.json")
+            # Try alternative locations
+            alt_paths = [
+                os.path.join(os.path.dirname(config_path), "rel2id.json"),
+                "rel2id.json",
+                os.path.join("rel2id", "nerel-rel2id.json")
+            ]
+            for alt_path in alt_paths:
+                if os.path.exists(alt_path):
+                    rel2id_path = alt_path
+                    break
         
         if os.path.exists(rel2id_path):
             with open(rel2id_path, 'r', encoding='utf-8') as f:
@@ -120,7 +116,7 @@ class DreeamInference:
             )
         
         # Load trained weights
-        checkpoint_path = os.path.join(self.model_path, "best.ckpt")
+        checkpoint_path = self.model_path
         if not os.path.exists(checkpoint_path):
             checkpoint_path = os.path.join(self.model_path, "last.ckpt")
         
@@ -549,10 +545,8 @@ if __name__ == "__main__":
     
     # Initialize the inference model
     inference = DreeamInference(
-        model_path="./logs/your_experiment",
-        config_path="./dreeam-config.json",
-        device="auto",
-        batch_size=4
+        config_path="./nerel-config.json",
+        device="auto"
     )
     
     # Example text and entities

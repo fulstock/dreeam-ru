@@ -9,34 +9,27 @@ import os
 def test_simple():
     """Test with the simplest possible case."""
     
-    # Check if we have a model first
-    logs_dir = "./logs"
-    if not os.path.exists(logs_dir):
-        print("No logs directory found. Please train a model first.")
-        return
+    # Check if we have a config file
+    config_path = "./nerel-config.json"
+    if not os.path.exists(config_path):
+        # Try alternative config files
+        alternative_configs = ["./dreeam-config.json", "./config.json"]
+        for alt_config in alternative_configs:
+            if os.path.exists(alt_config):
+                config_path = alt_config
+                break
+        else:
+            print(f"No config file found. Tried: {[config_path] + alternative_configs}")
+            return
     
-    available_models = [d for d in os.listdir(logs_dir) 
-                      if os.path.isdir(os.path.join(logs_dir, d))]
-    
-    if not available_models:
-        print("No models found in logs directory.")
-        return
-    
-    # Prefer nerel-ckpt if available
-    if "nerel-ckpt" in available_models:
-        model_path = os.path.join(logs_dir, "nerel-ckpt")
-    else:
-        model_path = os.path.join(logs_dir, available_models[0])
-    print(f"Using model: {model_path}")
+    print(f"Using config: {config_path}")
     
     try:
         # Initialize inference
         print("Initializing inference model...")
         inference = DreeamInference(
-            model_path=model_path,
-            config_path="./dreeam-config.json",
-            device="auto",
-            batch_size=1  # Use small batch size
+            config_path=config_path,
+            device="auto"
         )
         print("Model loaded successfully!")
         

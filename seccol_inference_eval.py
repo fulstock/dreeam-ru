@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-NEREL1.1 Inference and Evaluation Script
+SECCOL Inference and Evaluation Script
 
-This script processes NEREL1.1 BRAT format files, runs relation extraction inference,
+This script processes SECCOL BRAT format files, runs relation extraction inference,
 and evaluates the predictions against gold standard relations.
 """
 
@@ -107,7 +107,7 @@ class BRATParser:
             arg1 = relation_info[1].split(':')[1] if ':' in relation_info[1] else relation_info[1]
             arg2 = relation_info[2].split(':')[1] if ':' in relation_info[2] else relation_info[2]
             
-            # Skip some special relations
+            # Skip some special relations that are not relevant for evaluation
             if relation_type in ['ALTERNATIVE_NAME']:
                 return
             
@@ -119,8 +119,8 @@ class BRATParser:
             })
 
 
-class NERELEvaluator:
-    """Evaluator for NEREL relation extraction."""
+class SeccolEvaluator:
+    """Evaluator for SECCOL relation extraction."""
     
     def __init__(self):
         self.true_positives = 0
@@ -244,15 +244,15 @@ def extract_gold_relations(parsed_data: Dict) -> Set[Tuple[str, str, str]]:
     return gold_relations
 
 
-def process_nerel_files(test_dir: str, 
+def process_seccol_files(test_dir: str, 
                        inference_model: DreeamInference,
                        max_files: int = None,
                        verbose: bool = False) -> Dict:
     """
-    Process all NEREL test files and evaluate predictions.
+    Process all SECCOL test files and evaluate predictions.
     
     Args:
-        test_dir: Path to NEREL test directory
+        test_dir: Path to SECCOL test directory
         inference_model: DreeamInference instance
         max_files: Maximum number of files to process (for testing)
         verbose: Whether to print detailed progress
@@ -261,7 +261,7 @@ def process_nerel_files(test_dir: str,
         Evaluation results
     """
     parser = BRATParser()
-    evaluator = NERELEvaluator()
+    evaluator = SeccolEvaluator()
     
     # Find all text files
     txt_files = [f for f in os.listdir(test_dir) if f.endswith('.txt')]
@@ -373,16 +373,14 @@ def print_results(metrics: Dict):
 
 def main():
     """Main function."""
-    parser = argparse.ArgumentParser(description='NEREL1.1 Inference and Evaluation')
-    parser.add_argument('--test_dir', default='S:/HRCode/data/NEREL1.1/test',
-                      help='Path to NEREL1.1 test directory')
-    parser.add_argument('--model_path', default='./ckpt/NEREL-rubert-ep40-single.ckpt',
-                      help='Path to trained model')
-    parser.add_argument('--config_path', default='./nerel-config.json',
+    parser = argparse.ArgumentParser(description='SECCOL Inference and Evaluation')
+    parser.add_argument('--test_dir', default='S:/HRCode/data/seccol/seccol_events_texts_1500_new2-div/test',
+                      help='Path to SECCOL test directory')
+    parser.add_argument('--config_path', default='./seccol-config.json',
                       help='Path to configuration file')
     parser.add_argument('--max_files', type=int, default=None,
                       help='Maximum number of files to process (for testing)')
-    parser.add_argument('--output_file', default='nerel_evaluation_results.json',
+    parser.add_argument('--output_file', default='seccol_evaluation_results.json',
                       help='Output file for detailed results')
     parser.add_argument('--verbose', action='store_true',
                       help='Print verbose output')
@@ -394,17 +392,10 @@ def main():
         print(f"Error: Test directory not found: {args.test_dir}")
         return
     
-    # Check for available models if default doesn't exist
-    if not os.path.exists(args.model_path):
-        logs_dir = "./logs"
-        if os.path.exists(logs_dir):
-            available_models = [d for d in os.listdir(logs_dir) 
-                              if os.path.isdir(os.path.join(logs_dir, d))]
-            if "nerel-ckpt" in available_models:
-                args.model_path = os.path.join(logs_dir, "nerel-ckpt")
-            elif available_models:
-                args.model_path = os.path.join(logs_dir, available_models[0])
-                print(f"Using model: {args.model_path}")
+    # Check if config file exists
+    if not os.path.exists(args.config_path):
+        print(f"Error: Configuration file not found: {args.config_path}")
+        return
     
     print("Initializing DREEAM inference model...")
     try:
@@ -418,9 +409,9 @@ def main():
         return
     
     # Process files and evaluate
-    print(f"\nProcessing NEREL1.1 test files from: {args.test_dir}")
+    print(f"\nProcessing SECCOL test files from: {args.test_dir}")
     
-    metrics = process_nerel_files(
+    metrics = process_seccol_files(
         test_dir=args.test_dir,
         inference_model=inference_model,
         max_files=args.max_files,

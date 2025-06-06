@@ -285,11 +285,6 @@ for ds in sets:
                             sent_id = [sent_id for sent_id, (sent_start, sent_end) in enumerate(sentence_spans) if sent_start <= start_char and end_char <= sent_end][0]
                         except IndexError:
                             total_tokenizer_errors_count += 1
-                            # print(txtdata)
-                            # print(txtdata[start_char : end_char])
-                            # print(start_char, end_char)
-                            # print(sentence_spans)
-                            # print([txtdata[sent_start : sent_end] for sent_start, sent_end in sentence_spans])
                             continue
 
                         tokenized_sentence = tokenized_sentences[sent_id]

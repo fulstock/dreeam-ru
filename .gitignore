@@ -1,5 +1,4 @@
-
-*.json
+wiki-test/
 *.pyc
 dataset/*
 checkpoints/*

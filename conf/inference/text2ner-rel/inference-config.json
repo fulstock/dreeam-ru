@@ -1,0 +1,24 @@
+{
+    "model_args": {
+        "model_name_or_path": "DeepPavlov/rubert-base-cased",
+        "transformer_type": "bert",
+        "emb_size": 768,
+        "block_size": 64,
+        "max_sent_num": 101,
+        "evi_thresh": 0.2
+    },
+    "data_args": {
+        "max_seq_length": 1600,
+        "pad_to_max_length": true,
+        "relation_file": "./meta/relations.json"
+    },
+    "training_args": {
+        "output_dir": "./logs/inference",
+        "per_device_eval_batch_size": 1,
+        "no_cuda": false,
+        "seed": 42,
+        "local_rank": -1,
+        "fp16": false,
+        "fp16_opt_level": "O1"
+    }
+} 

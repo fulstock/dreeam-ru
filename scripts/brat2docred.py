@@ -21,7 +21,7 @@ morph = pymorphy2.MorphAnalyzer()
 
 brat2mrc_parser = argparse.ArgumentParser(description = "Brat to docred formatter script.")
 brat2mrc_parser.add_argument('--brat_dataset_path', type = str, required = True, help = "Path to brat dataset (with train, dev, test dirs).")
-brat2mrc_parser.add_argument('--subsets', type = str, default = ["train", "dev", "test"], help = "Subsets to convert, by default equals ['train', 'dev', 'test']. Should be None if a brat_dataset_path is a subset.")
+brat2mrc_parser.add_argument('--subsets', type = str, default = "train,dev,test", help = "Subsets to convert, by default equals ['train', 'dev', 'test']. Should be None if a brat_dataset_path is a subset.")
 brat2mrc_parser.add_argument('--ner_path', type = str, required = True, help = 'Path to ner tags file with format ["CLASS1", "CLASS2", ...].')
 brat2mrc_parser.add_argument('--rel_path', type = str, required = True, help = 'Path to relation tags file with format ["CLASS1", "CLASS2", ...].')
 brat2mrc_parser.add_argument('--docred_output_path', type = str, default = None, help = "Path, where formatted dataset would be stored. By default, same path as in --brat_dataset_path would be used.")
@@ -73,9 +73,10 @@ ner2id = {tag : tid for tid, tag in enumerate(ner_tags)}
 with open(os.path.join(docred_output_path, "ner2id.json"), "w") as ner2id_file:
     json.dump(ner2id, ner2id_file, ensure_ascii = False)
 
-sets = args.subsets
+sets = args.subsets.split(',')
 if sets is None:
     sets = [""]
+    
 for ds in sets:
 
     total_relations_count = 0

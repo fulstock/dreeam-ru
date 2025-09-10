@@ -79,14 +79,14 @@ def train(args, model, train_features, dev_features, id2rel):
                     model.zero_grad()
                     num_steps += 1
                     
-                wandb.log(outputs["loss"], step=num_steps)
+                # wandb.log(outputs["loss"], step=num_steps)
 
                 best_offi_results = None
                 
                 if (step + 1) == len(train_dataloader) or (args.evaluation_steps > 0 and num_steps % args.evaluation_steps == 0 and step % args.gradient_accumulation_steps == 0):
                     
-                    dev_scores, dev_output, official_results, results = evaluate(args, model, dev_features, id2rel, tag="dev")
-                    wandb.log(dev_scores, step=num_steps)
+                    dev_scores, dev_output, official_results, results, _ = evaluate(args, model, dev_features, id2rel, tag="dev")
+                    # wandb.log(dev_scores, step=num_steps)
                     
                     print(dev_output)
                     if dev_scores["dev_F1_ign"] > best_score:
@@ -131,79 +131,101 @@ def train(args, model, train_features, dev_features, id2rel):
     finetune(train_features, optimizer, args.num_train_epochs, num_steps, id2rel)
 
 def evaluate(args, model, features, id2rel, tag="dev"):
-    
     dataloader = DataLoader(features, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False)
     preds, evi_preds = [], []
     scores, topks = [], []
     attns = []
-    
     for batch in tqdm(dataloader, desc=f"Evaluating batches"):
         model.eval()
-
         if args.save_attn:
             tag = "infer"
-
         inputs = load_input(batch, args.device, tag)
-
         with torch.no_grad():
             outputs = model(**inputs)
             pred = outputs["rel_pred"]
             pred = pred.cpu().numpy()
             pred[np.isnan(pred)] = 0
             preds.append(pred)
-
             if "scores" in outputs:
                 scores.append(outputs["scores"].cpu().numpy())  
                 topks.append(outputs["topks"].cpu().numpy())   
-
             if "evi_pred" in outputs: # relation extraction and evidence extraction
                 evi_pred = outputs["evi_pred"]
                 evi_pred = evi_pred.cpu().numpy()
                 evi_preds.append(evi_pred)   
-            
             if "attns" in outputs: # attention recorded
                 attn = outputs["attns"]
                 attns.extend([a.cpu().numpy() for a in attn])
-
-
     preds = np.concatenate(preds, axis=0)
-
     if scores != []:
         scores = np.concatenate(scores, axis=0)
         topks =  np.concatenate(topks, axis=0)
-
     if evi_preds != []:
         evi_preds = np.concatenate(evi_preds, axis=0)
-    
     official_results, results = to_official(id2rel, preds, features, evi_preds = evi_preds, scores = scores, topks = topks)
-    
+
+    detailed_metrics = None  # Initialize variable for detailed metrics
     if len(official_results) > 0:
         if tag == "test":
             if args.do_train and args.train_file:
-                best_re, best_evi, best_re_ign, _ = official_evaluate(official_results, args.data_dir, args.train_file, args.test_file)
+                best_re, best_evi, best_re_ign, detailed_metrics = official_evaluate(official_results, args.data_dir, args.train_file, args.test_file)
             else:
                 best_re = best_evi = best_re_ign = [0, 0, 0]
         else:
-            best_re, best_evi, best_re_ign, _ = official_evaluate(official_results, args.data_dir, args.train_file, args.dev_file)
+            best_re, best_evi, best_re_ign, detailed_metrics = official_evaluate(official_results, args.data_dir, args.train_file, args.dev_file)
     else:
         best_re = best_evi = best_re_ign = [0, 0, 0]
+
+    # Define 'output' BEFORE trying to use it or print detailed metrics
     output = {
         tag + "_rel": [i * 100 for i in best_re],
         tag + "_rel_ign": [i * 100 for i in best_re_ign], 
         tag + "_evi": [i * 100 for i in best_evi],
     }
-    scores = {"dev_F1": best_re[-1] * 100, "dev_evi_F1": best_evi[-1] * 100, "dev_F1_ign": best_re_ign[-1] * 100}
+    scores_dict = {"dev_F1": best_re[-1] * 100, "dev_evi_F1": best_evi[-1] * 100, "dev_F1_ign": best_re_ign[-1] * 100}
+
+        # Print detailed metrics to console if available
+    if detailed_metrics is not None:
+        print("\n--- Detailed Per-Relation Metrics (Sorted by Relation Name) ---")
+        # Sort relations alphabetically
+        sorted_relations = sorted(detailed_metrics['per_relation'].keys())
+        rel_data = []
+        for rel in sorted_relations:
+            metrics = detailed_metrics['per_relation'][rel]
+            rel_data.append({
+                'Relation': rel,
+                'Precision': f"{metrics['precision']:.4f}",
+                'Recall': f"{metrics['recall']:.4f}",
+                'F1': f"{metrics['f1']:.4f}",
+                'TP': metrics['tp'],
+                'FP': metrics['fp'],
+                'FN': metrics['fn']
+            })
+        # Create DataFrame and print
+        rel_df = pd.DataFrame(rel_data)
+        print(rel_df.to_string(index=False))
+
+        # Print Micro and Macro Averages with Precision and Recall
+        print(f"\n--- Aggregate Metrics ---")
+        macro = detailed_metrics['macro_avg']
+        micro = detailed_metrics['micro_avg']
+        print(f"Macro Avg Precision: {macro['precision']:.4f}")
+        print(f"Macro Avg Recall:    {macro['recall']:.4f}")
+        print(f"Macro Avg F1:        {macro['f1']:.4f}")
+        print(f"Micro Avg Precision: {micro['precision']:.4f}")
+        print(f"Micro Avg Recall:    {micro['recall']:.4f}")
+        print(f"Micro Avg F1:        {micro['f1']:.4f}")
 
     if args.save_attn:
-        
         attns_path = os.path.join(args.load_path, f"{os.path.splitext(args.test_file)[0]}.attns")        
         print(f"saving attentions into {attns_path} ...")
         with open(attns_path, "wb") as f:
             pickle.dump(attns, f)
 
-    return scores, output, official_results, results
+    # Return the scores dictionary, output, official_results, results, and detailed_metrics
+    return scores_dict, output, official_results, results, detailed_metrics
 
-def dump_to_file(offi:list, offi_path: str, scores: list, score_path: str, results: list = [], res_path: str = "", thresh: float = None):
+def dump_to_file(offi:list, offi_path: str, scores: list, score_path: str, results: list = [], res_path: str = "", thresh: float = None, detailed_metrics: dict = None):
     '''
     dump scores and (top-k) predictions to file.
     
@@ -216,6 +238,52 @@ def dump_to_file(offi:list, offi_path: str, scores: list, score_path: str, resul
     scores_pd = pd.DataFrame.from_dict(scores, orient="index", columns = headers)
     print(scores_pd)
     scores_pd.to_csv(score_path, sep='\t')
+
+        # Save detailed per-relation metrics if provided
+    if detailed_metrics is not None:
+        detailed_path = os.path.splitext(score_path)[0] + "_detailed.csv"
+        print(f"saving detailed per-relation metrics into {detailed_path} ...")
+        
+        # Prepare data for CSV
+        csv_data = []
+        # Add per-relation data
+        for rel, metrics in detailed_metrics['per_relation'].items():
+            csv_data.append({
+                'Type': 'Per-Relation',
+                'Relation/Aggregate': rel,
+                'Precision': metrics['precision'],
+                'Recall': metrics['recall'],
+                'F1': metrics['f1'],
+                'TP': metrics['tp'],
+                'FP': metrics['fp'],
+                'FN': metrics['fn']
+            })
+        # Add Macro Average
+        macro = detailed_metrics['macro_avg']
+        csv_data.append({
+            'Type': 'Macro Average',
+            'Relation/Aggregate': 'Macro',
+            'Precision': macro['precision'],
+            'Recall': macro['recall'],
+            'F1': macro['f1'],
+            'TP': '', 'FP': '', 'FN': ''
+        })
+        # Add Micro Average
+        micro = detailed_metrics['micro_avg']
+        csv_data.append({
+            'Type': 'Micro Average',
+            'Relation/Aggregate': 'Micro',
+            'Precision': micro['precision'],
+            'Recall': micro['recall'],
+            'F1': micro['f1'],
+            'TP': micro['tp'],
+            'FP': micro['fp'],
+            'FN': micro['fn']
+        })
+        
+        # Create and save DataFrame
+        detailed_df = pd.DataFrame(csv_data)
+        detailed_df.to_csv(detailed_path, index=False)
 
     if len(results) != 0:
         assert res_path != ""
@@ -239,7 +307,7 @@ def main():
     parser = add_args(parser)
     args = parser.parse_args()
         
-    wandb.init(project="DocRED", name=args.display_name)
+    # wandb.init(project="DocRED", name=args.display_name)
 
     # create directory to save checkpoints and predicted files
     time = str(datetime.datetime.now()).replace(' ','_').replace(':','-')
@@ -312,14 +380,14 @@ def main():
         
         if args.eval_mode != "fushion":
 
-            test_scores, test_output, official_results, results = evaluate(args, model, test_features, id2rel, tag="test")   
-            wandb.log(test_scores)
+            test_scores, test_output, official_results, results, detailed_metrics = evaluate(args, model, test_features, id2rel, tag="test")  
+            # wandb.log(test_scores)
 
             offi_path = os.path.join(args.load_path, args.pred_file)
             score_path = os.path.join(args.load_path, f"{basename}_scores.csv")
             res_path = os.path.join(args.load_path, f"topk_{args.pred_file}")
 
-            dump_to_file(official_results, offi_path, test_output, score_path, results, res_path)          
+            dump_to_file(official_results, offi_path, test_output, score_path, results, res_path, detailed_metrics=detailed_metrics)          
 
         else: # inference stage fusion
 
@@ -340,22 +408,21 @@ def main():
             
             merged_offi, thresh = merge_results(id2rel, results, pseudo_results, test_features, thresh)
             if args.do_train:
-                merged_re, merged_evi, merged_re_ign, _ = official_evaluate(merged_offi, args.data_dir, args.train_file, args.test_file)
+                merged_re, merged_evi, merged_re_ign, merged_detailed_metrics = official_evaluate(merged_offi, args.data_dir, args.train_file, args.test_file)
             else:
                 merged_re = merged_evi = merged_re_ign = [0, 0, 0]
-            
+                merged_detailed_metrics = None
+
             tag = args.test_file.split('.')[0]
             merged_output = {
                 tag + "_rel": [i * 100 for i in merged_re],
-                tag + "_rel_ign": [i * 100 for i in merged_re_ign], 
+                tag + "_rel_ign": [i * 100 for i in merged_re_ign],
                 tag + "_evi": [i * 100 for i in merged_evi],
             }
-            
             wandb.log({"dev_F1": merged_re[-1] * 100, "dev_evi_F1": merged_evi[-1] * 100, "dev_F1_ign": merged_re_ign[-1] * 100})
-
             offi_path = os.path.join(args.load_path, f"fused_{args.pred_file}")
             score_path = os.path.join(args.load_path, f"{basename}_fused_scores.csv")
-            dump_to_file(merged_offi, offi_path, merged_output, score_path, thresh = thresh)
+            dump_to_file(merged_offi, offi_path, merged_output, score_path, thresh=thresh, detailed_metrics=merged_detailed_metrics)
 
 
 if __name__ == "__main__":

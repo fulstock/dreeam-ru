@@ -2,12 +2,12 @@ python3 run.py --do_train \
     --data_dir $HOME/data/relations/NEREL/naa-docred-split \
     --transformer_type bert \
     --model_name_or_path DeepPavlov/rubert-base-cased \
-    --display_name nerel-test03 \
-    --save_path ./logs/nerel-test03 \
+    --display_name nerel-ckpt-new \
+    --save_path ./logs/nerel-ckpt-new \
     --train_file train.json \
     --dev_file dev.json \
     --test_file test.json \
-    --train_batch_size 4 \
+    --train_batch_size 1 \
     --test_batch_size 1 \
     --gradient_accumulation_steps 1 \
     --num_labels 2 \

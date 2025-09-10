@@ -257,47 +257,60 @@ def gen_train_facts(data_file_name, truth_dir):
     return fact_in_train
 
 
-def official_evaluate(tmp, path, train_file = "train_annotated.json", dev_file = "dev.json"):
+from collections import defaultdict
+
+def official_evaluate(tmp, path, train_file="train_annotated.json", dev_file="dev.json"):
     '''
-        Adapted from the official evaluation code
+    Adapted from the official evaluation code.
+    Now returns detailed per-relation metrics along with micro and macro averages.
+    Returns:
+        tuple: (
+            [re_p, re_r, re_f1] for all relations (micro average),
+            [evi_p, evi_r, evi_f1],
+            [re_p_ignore_train_annotated, re_r, re_f1_ignore_train_annotated],
+            detailed_metrics_dict
+        )
     '''
     truth_dir = os.path.join(path, 'ref')
-
     if not os.path.exists(truth_dir):
         os.makedirs(truth_dir)
 
     fact_in_train_annotated = gen_train_facts(os.path.join(path, train_file), truth_dir)
-    # fact_in_train_distant = gen_train_facts(os.path.join(path, "train_distant.json"), truth_dir)
+    truth = json.load(open(os.path.join(path, dev_file), "r", encoding="UTF-8"))
 
-    truth = json.load(open(os.path.join(path, dev_file), "r", encoding = "UTF-8"))
-        
+    # Initialize dictionaries to store per-relation statistics
+    relation_stats = {}  # {relation_type: {'tp': 0, 'fp': 0, 'fn': 0}}
+    all_relations = set()
+
     std = {}
     tot_evidences = 0
     titleset = set([])
-
     title2vectexSet = {}
 
     for x in truth:
         title = x['title']
         titleset.add(title)
-
         vertexSet = x['vertexSet']
         title2vectexSet[title] = vertexSet
-
-        if 'labels' not in x: # official test set from DocRED
+        if 'labels' not in x:  # official test set from DocRED
             continue
-        
         for label in x['labels']:
             r = label['r']
+            all_relations.add(r)  # Collect all possible relation types
             h_idx = label['h']
             t_idx = label['t']
             std[(title, r, h_idx, t_idx)] = set(label['evidence'])
             tot_evidences += len(label['evidence'])
 
+    # Initialize stats for each relation
+    for rel in all_relations:
+        relation_stats[rel] = {'tp': 0, 'fp': 0, 'fn': 0}
+
     tot_relations = len(std)
+
+    # Process predictions
     tmp.sort(key=lambda x: (x['title'], x['h_idx'], x['t_idx'], x['r']))
     submission_answer = [tmp[0]]
-
     for i in range(1, len(tmp)):
         x = tmp[i]
         y = tmp[i - 1]
@@ -307,71 +320,138 @@ def official_evaluate(tmp, path, train_file = "train_annotated.json", dev_file =
     correct_re = 0
     correct_evidence = 0
     pred_evi = 0
-
     correct_in_train_annotated = 0
-    correct_in_train_distant = 0
     titleset2 = set([])
+
+    # First pass: Calculate TP and FP for each relation
     for x in submission_answer:
         title = x['title']
         h_idx = x['h_idx']
         t_idx = x['t_idx']
         r = x['r']
         titleset2.add(title)
+
         if title not in title2vectexSet:
             continue
-        vertexSet = title2vectexSet[title]
 
-        if 'evidence' in x : #and (title, h_idx, t_idx) in std:
-            evi = set(x['evidence'])
-        else:
-            evi = set([])
-        pred_evi += len(evi)
+        if r not in relation_stats:
+            relation_stats[r] = {'tp': 0, 'fp': 0, 'fn': 0}
 
-        if (title, r, h_idx, t_idx) in std:
+        pred_key = (title, r, h_idx, t_idx)
+        is_correct = pred_key in std
+
+        if is_correct:
             correct_re += 1
-            stdevi = std[(title, r, h_idx, t_idx)]
-            correct_evidence += len(stdevi & evi)
-            in_train_annotated = in_train_distant = False
+            relation_stats[r]['tp'] += 1
+
+            # Handle evidence (unchanged from original)
+            if 'evidence' in x:
+                evi = set(x['evidence'])
+                stdevi = std[pred_key]
+                correct_evidence += len(stdevi & evi)
+            # Handle training facts (unchanged from original)
+            vertexSet = title2vectexSet[title]
+            in_train_annotated = False
             for n1 in vertexSet[h_idx]:
                 for n2 in vertexSet[t_idx]:
                     if (n1['name'], n2['name'], r) in fact_in_train_annotated:
                         in_train_annotated = True
-                    # if (n1['name'], n2['name'], r) in fact_in_train_distant:
-                    #     in_train_distant = True
-
             if in_train_annotated:
                 correct_in_train_annotated += 1
-            # if in_train_distant:
-            #     correct_in_train_distant += 1
+        else:
+            relation_stats[r]['fp'] += 1
 
-    re_p = 1.0 * correct_re / len(submission_answer)
+        # Count predicted evidence (unchanged)
+        if 'evidence' in x:
+            pred_evi += len(set(x['evidence']))
+
+    # Second pass: Calculate FN for each relation
+    for (title, r, h_idx, t_idx) in std.keys():
+        if r not in relation_stats:
+            relation_stats[r] = {'tp': 0, 'fp': 0, 'fn': 0}
+
+        pred_exists = any(
+            p for p in submission_answer
+            if p['title'] == title and p['h_idx'] == h_idx and p['t_idx'] == t_idx and p['r'] == r
+        )
+        if not pred_exists:
+            relation_stats[r]['fn'] += 1
+
+    # Calculate overall metrics (unchanged)
+    re_p = 1.0 * correct_re / len(submission_answer) if len(submission_answer) > 0 else 0
     re_r = 1.0 * correct_re / tot_relations if tot_relations != 0 else 0
-    if re_p + re_r == 0:
-        re_f1 = 0
-    else:
-        re_f1 = 2.0 * re_p * re_r / (re_p + re_r)
+    re_f1 = 2.0 * re_p * re_r / (re_p + re_r) if (re_p + re_r) != 0 else 0
 
     evi_p = 1.0 * correct_evidence / pred_evi if pred_evi > 0 else 0
     evi_r = 1.0 * correct_evidence / tot_evidences if tot_evidences > 0 else 0
+    evi_f1 = 2.0 * evi_p * evi_r / (evi_p + evi_r) if (evi_p + evi_r) != 0 else 0
 
-    if evi_p + evi_r == 0:
-        evi_f1 = 0
-    else:
-        evi_f1 = 2.0 * evi_p * evi_r / (evi_p + evi_r)
+    re_p_ignore_train_annotated = 1.0 * (correct_re - correct_in_train_annotated) / (
+                len(submission_answer) - correct_in_train_annotated + 1e-5)
+    re_f1_ignore_train_annotated = 2.0 * re_p_ignore_train_annotated * re_r / (
+                re_p_ignore_train_annotated + re_r) if (re_p_ignore_train_annotated + re_r) != 0 else 0
 
-    re_p_ignore_train_annotated = 1.0 * (correct_re - correct_in_train_annotated) / (len(submission_answer) - correct_in_train_annotated + 1e-5)
-    re_p_ignore_train = 1.0 * (correct_re - correct_in_train_distant) / (len(submission_answer) - correct_in_train_distant + 1e-5)
+    # Calculate per-relation metrics, macro, and micro averages
+    per_relation_metrics = {}
+    total_tp, total_fp, total_fn = 0, 0, 0
+    f1_sum = 0
+    precision_sum = 0
+    recall_sum = 0
+    valid_relations_for_macro = 0
 
-    if re_p_ignore_train_annotated + re_r == 0:
-        re_f1_ignore_train_annotated = 0
-    else:
-        re_f1_ignore_train_annotated = 2.0 * re_p_ignore_train_annotated * re_r / (re_p_ignore_train_annotated + re_r)
+    for rel, stats in relation_stats.items():
+        tp, fp, fn = stats['tp'], stats['fp'], stats['fn']
+        total_tp += tp
+        total_fp += fp
+        total_fn += fn
 
-    if re_p_ignore_train + re_r == 0:
-        re_f1_ignore_train = 0
-    else:
-        re_f1_ignore_train = 2.0 * re_p_ignore_train * re_r / (re_p_ignore_train + re_r)
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
 
-    return [re_p, re_r, re_f1], [evi_p, evi_r, evi_f1],\
+        if (tp + fn) > 0:  # Only include relations that appear in ground truth for macro avg
+            f1_sum += f1
+            precision_sum += precision
+            recall_sum += recall
+            valid_relations_for_macro += 1
+
+        per_relation_metrics[rel] = {
+            'precision': precision,
+            'recall': recall,
+            'f1': f1,
+            'tp': tp,
+            'fp': fp,
+            'fn': fn
+        }
+
+    # Calculate Micro Average
+    micro_precision = total_tp / (total_tp + total_fp) if (total_tp + total_fp) > 0 else 0.0
+    micro_recall = total_tp / (total_tp + total_fn) if (total_tp + total_fn) > 0 else 0.0
+    micro_f1 = 2 * micro_precision * micro_recall / (micro_precision + micro_recall) if (
+                                                                                                     micro_precision + micro_recall) > 0 else 0.0
+
+    # Calculate Macro Average
+    macro_f1 = f1_sum / valid_relations_for_macro if valid_relations_for_macro > 0 else 0.0
+    macro_precision = precision_sum / valid_relations_for_macro if valid_relations_for_macro > 0 else 0.0
+    macro_recall = recall_sum / valid_relations_for_macro if valid_relations_for_macro > 0 else 0.0
+
+    detailed_metrics = {
+        'per_relation': per_relation_metrics,
+        'micro_avg': {
+            'precision': micro_precision,
+            'recall': micro_recall,
+            'f1': micro_f1,
+            'tp': total_tp,
+            'fp': total_fp,
+            'fn': total_fn
+        },
+        'macro_avg': {
+            'precision': macro_precision,
+            'recall': macro_recall,
+            'f1': macro_f1
+        }
+    }
+
+    return [re_p, re_r, re_f1], [evi_p, evi_r, evi_f1], \
         [re_p_ignore_train_annotated, re_r, re_f1_ignore_train_annotated], \
-        [re_p_ignore_train, re_r, re_f1_ignore_train]
+        detailed_metrics

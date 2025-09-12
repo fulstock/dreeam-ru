@@ -1,9 +1,9 @@
 python3 run.py --do_train \
-    --data_dir $HOME/data/relations/NEREL/naa-docred-split \
+    --data_dir $HOME/data/relations/NEREL/naa-docred-split-sent \
     --transformer_type bert \
     --model_name_or_path DeepPavlov/rubert-base-cased \
-    --display_name nerel-ckpt-new \
-    --save_path ./logs/nerel-ckpt-new \
+    --display_name nerel-ckpt-sent \
+    --save_path ./logs/nerel-ckpt-sent \
     --train_file train.json \
     --dev_file dev.json \
     --test_file test.json \
@@ -16,7 +16,7 @@ python3 run.py --do_train \
     --evi_thresh 0.2 \
     --evi_lambda 0.05 \
     --warmup_ratio 0.06 \
-    --num_train_epochs 40 \
+    --num_train_epochs 1 \
     --seed 42 \
     --num_class 48 \
     --max_seq_length 900 \

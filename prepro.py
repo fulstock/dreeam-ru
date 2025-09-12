@@ -15,6 +15,8 @@ def add_entity_markers(sample, tokenizer, entity_start, entity_end):
     for i_s, sent in enumerate(sample['sents']):
     # add * marks to the beginning and end of entities
         new_map = {}
+
+        # print(sent)
         
         for i_t, token in enumerate(sent):
             tokens_wordpiece = tokenizer.tokenize(token)
@@ -209,12 +211,14 @@ def read_docred(dataset_dir,
             entity_pos.append([])
             assert len(e) != 0
             for m in e:
-                # print(m)
-                # print(m["pos"])
-                # print(m["pos"][0])
-                # print(m["sent_id"])
-                # print(sent_map)
-                # print(len(sent_map))
+                # print("m", m)
+                # print('m["pos"]', m["pos"])
+                # print('m["pos"][0]', m["pos"][0])
+                # print('m["sent_id"]', m["sent_id"])
+                # print('sent_map', sent_map)
+                # print('len(sent_map)', len(sent_map))
+                # print('sent_map[m["sent_id"]]', sent_map[m["sent_id"]])
+                # print('sent_map[m["sent_id"]][m["pos"][0]]', sent_map[m["sent_id"]][m["pos"][0]])
                 start = sent_map[m["sent_id"]][m["pos"][0]]
                 end = sent_map[m["sent_id"]][m["pos"][1]]
                 label = m["type"]

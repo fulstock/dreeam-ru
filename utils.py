@@ -41,6 +41,7 @@ def collate_fn(batch):
         sent_labels_tensor = []
         for sent_label in sent_labels:
             sent_label = np.array(sent_label)
+            # print('sent_label', sent_label)
             sent_labels_tensor.append(np.pad(sent_label, ((0, 0), (0, max_sent - sent_label.shape[1]))))
         sent_labels_tensor = torch.from_numpy(np.concatenate(sent_labels_tensor, axis=0))
     else:

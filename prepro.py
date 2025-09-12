@@ -273,6 +273,16 @@ def read_docred(dataset_dir,
         input_ids = tokenizer.convert_tokens_to_ids(sents)
         input_ids = tokenizer.build_inputs_with_special_tokens(input_ids)
 
+        # if len(sent_labels) < 1:
+        #     print({'input_ids': input_ids,
+        #            'entity_pos': entity_pos,
+        #            'labels': relations,
+        #            'hts': hts,
+        #            'sent_pos': sent_pos,
+        #            'sent_labels': sent_labels,
+        #            'title': sample['title'],
+        #            })
+
         feature = [{'input_ids': input_ids,
                    'entity_pos': entity_pos,
                    'labels': relations,

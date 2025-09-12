@@ -7,7 +7,7 @@ python3 run.py --do_train \
     --train_file train.json \
     --dev_file dev.json \
     --test_file test.json \
-    --train_batch_size 1 \
+    --train_batch_size 32 \
     --test_batch_size 1 \
     --gradient_accumulation_steps 1 \
     --num_labels 2 \
@@ -16,7 +16,7 @@ python3 run.py --do_train \
     --evi_thresh 0.2 \
     --evi_lambda 0.05 \
     --warmup_ratio 0.06 \
-    --num_train_epochs 1 \
+    --num_train_epochs 80 \
     --seed 42 \
     --num_class 48 \
     --max_seq_length 900 \

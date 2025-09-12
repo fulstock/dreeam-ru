@@ -6,6 +6,7 @@ def convert_doc_to_sent_level(input_file, output_file):
     """
     Converts a document-level RE dataset to sentence-level by removing
     cross-sentence relations and correctly splitting vertexSets.
+    Adds 'currpart_sent_id': 0 to each mention in the new vertexSet.
 
     Args:
         input_file (str): Path to the input JSON file (document-level data).
@@ -48,8 +49,6 @@ def convert_doc_to_sent_level(input_file, output_file):
 
         # 2. Identify intra-sentence relations based on evidence and entity sentence
         intra_sent_relations_per_sentence = defaultdict(list)
-        # Map (h_orig_idx, t_orig_idx) to set of sentences where this specific intra-sent relation occurs
-        relation_to_sentences = defaultdict(set)
 
         for relation in labels:
             h_orig_idx = relation.get("h") # Head entity cluster index in original doc
@@ -60,7 +59,6 @@ def convert_doc_to_sent_level(input_file, output_file):
                 continue # Skip malformed or relations without evidence
 
             # Check if head and tail entities have mentions and get their primary sentence
-            # (Using the first mention's sent_id as the primary sentence for the entity in this context)
             h_mentions = orig_vertex_set[h_orig_idx] if h_orig_idx < len(orig_vertex_set) else []
             t_mentions = orig_vertex_set[t_orig_idx] if t_orig_idx < len(orig_vertex_set) else []
             if not h_mentions or not t_mentions:
@@ -81,7 +79,6 @@ def convert_doc_to_sent_level(input_file, output_file):
                 if entity_sent_global_id is not None and evidence_global_ids == {entity_sent_global_id}:
                     # This is a valid intra-sentence relation for sentence h_primary_sent_id
                     intra_sent_relations_per_sentence[h_primary_sent_id].append(relation)
-                    relation_to_sentences[(h_orig_idx, t_orig_idx)].add(h_primary_sent_id)
 
 
         # 3. Create sentence-level entries
@@ -99,7 +96,15 @@ def convert_doc_to_sent_level(input_file, output_file):
                 mention_indices_in_this_sent = entity_sent_mapping[orig_ent_idx].get(sent_id, [])
                 if mention_indices_in_this_sent:
                     # Create a new entity cluster containing only mentions from this sentence
-                    new_entity_cluster = [orig_vertex_set[orig_ent_idx][i] for i in mention_indices_in_this_sent]
+                    # AND add the 'currpart_sent_id': 0 key to each mention
+                    new_entity_cluster = []
+                    for i in mention_indices_in_this_sent:
+                        # Make a copy of the original mention dict to avoid modifying the input
+                        new_mention = orig_vertex_set[orig_ent_idx][i].copy()
+                        # Add the new key indicating the sentence ID within this new single-sentence document part
+                        new_mention["sent_id"] = 0
+                        new_entity_cluster.append(new_mention)
+
                     new_vertex_set.append(new_entity_cluster)
                     orig_to_new_entity_index[orig_ent_idx] = len(new_vertex_set) - 1
 
@@ -117,6 +122,7 @@ def convert_doc_to_sent_level(input_file, output_file):
                     new_relation = orig_relation.copy()
                     new_relation['h'] = orig_to_new_entity_index[orig_h]
                     new_relation['t'] = orig_to_new_entity_index[orig_t]
+                    new_relation['evidence'] = [0]
                     # The 'evidence' field should still be valid (pointing to global sent ID of this sentence)
                     new_labels.append(new_relation)
 
@@ -124,11 +130,11 @@ def convert_doc_to_sent_level(input_file, output_file):
             sent_data = {
                 "title": f"{title}_sent{sent_id}",
                 "part": part,
-                "sent_id": sent_id,
-                "global_sent_id": global_sent_id,
+                "currpart_sent_id": sent_id, # Local sentence ID within the original document
+                "global_sent_id": global_sent_id, # Global sentence ID from original document
                 # Include the sentence itself
                 "sents": [sents[sent_id]] if sent_id < len(sents) else [],
-                # Include the correctly split vertexSet
+                # Include the correctly split and updated vertexSet
                 "vertexSet": new_vertex_set,
                 # Include the filtered and remapped labels
                 "labels": new_labels

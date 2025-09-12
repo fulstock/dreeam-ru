@@ -126,6 +126,9 @@ def convert_doc_to_sent_level(input_file, output_file):
                     # The 'evidence' field should still be valid (pointing to global sent ID of this sentence)
                     new_labels.append(new_relation)
 
+            if len(new_labels) < 1:
+                continue
+
             # Create the sentence-level document entry
             sent_data = {
                 "title": f"{title}_sent{sent_id}",

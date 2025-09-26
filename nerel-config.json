@@ -1,12 +1,12 @@
 {
-	"transformer_type": "bert",
-	"model_name_or_path": "DeepPavlov/rubert-base-cased",
-	"model_path": "./ckpt/NEREL-rubert-ep40-single.ckpt",
+	"transformer_type": "roberta",
+	"model_name_or_path": "ai-forever/ruRoberta-large",
+	"model_path": "./ckpt/NEREL-ruroberta-ep60-single.ckpt",
 	"rel2id" : "./rel2id/nerel-rel2id.json",
 	"num_labels": 2,
 	"num_class": 48,
 	"evi_thresh": 0.2,
-	"max_seq_length": 1600,
+	"max_seq_length": 1460,
 	"max_sent_num": 101,
-	"batch_size": 8
+	"batch_size": 4
 }

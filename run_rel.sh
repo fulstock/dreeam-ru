@@ -1,24 +1,24 @@
 python3 run.py --do_train \
     --data_dir $HOME/data/relations/NEREL/naa-docred-split-sent \
-    --transformer_type bert \
-    --model_name_or_path DeepPavlov/rubert-base-cased \
-    --display_name nerel-ckpt-sent \
-    --save_path ./logs/nerel-ckpt-sent \
+    --transformer_type roberta \
+    --model_name_or_path ai-forever/ruRoberta-large \
+    --display_name nerel-sent-ruroberta-ckpt-fix \
+    --save_path ./logs/nerel-sent-ruroberta-ckpt-fix \
     --train_file train.json \
     --dev_file dev.json \
     --test_file test.json \
-    --train_batch_size 32 \
+    --train_batch_size 8 \
     --test_batch_size 1 \
-    --gradient_accumulation_steps 1 \
+    --gradient_accumulation_steps 4 \
     --num_labels 2 \
     --lr_transformer 3e-5 \
     --max_grad_norm 1.0 \
     --evi_thresh 0.2 \
     --evi_lambda 0.05 \
     --warmup_ratio 0.06 \
-    --num_train_epochs 80 \
-    --seed 42 \
+    --num_train_epochs 160 \
+    --seed 7777 \
     --num_class 48 \
-    --max_seq_length 900 \
+    --max_seq_length 600 \
     --max_sent_num 101 \
     --eval_mode single

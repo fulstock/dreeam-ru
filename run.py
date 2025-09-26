@@ -41,7 +41,7 @@ def load_input(batch, device, tag="dev"):
 def train(args, model, train_features, dev_features, id2rel):
 
     def finetune(features, optimizer, num_epoch, num_steps, id2rel):
-        best_score = 0
+        best_score = -1
         train_dataloader = DataLoader(features, batch_size=args.train_batch_size, shuffle=True, collate_fn=collate_fn, drop_last=True)
         train_iterator = range(int(num_epoch))
         total_steps = int(len(train_dataloader) * num_epoch // args.gradient_accumulation_steps)
@@ -69,7 +69,7 @@ def train(args, model, train_features, dev_features, id2rel):
                 loss = sum(loss) / args.gradient_accumulation_steps
                 scaler.scale(loss).backward()
 
-                if step % args.gradient_accumulation_steps == 0:
+                if (step + 1) % args.gradient_accumulation_steps == 0:
                     if args.max_grad_norm > 0:
                         scaler.unscale_(optimizer)
                         torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
@@ -83,7 +83,7 @@ def train(args, model, train_features, dev_features, id2rel):
 
                 best_offi_results = None
                 
-                if (step + 1) == len(train_dataloader) or (args.evaluation_steps > 0 and num_steps % args.evaluation_steps == 0 and step % args.gradient_accumulation_steps == 0):
+                if (step + 1) == len(train_dataloader) or (args.evaluation_steps > 0 and num_steps % args.evaluation_steps == 0 and (step + 1) % args.gradient_accumulation_steps == 0):
                     
                     dev_scores, dev_output, official_results, results, _ = evaluate(args, model, dev_features, id2rel, tag="dev")
                     # wandb.log(dev_scores, step=num_steps)
@@ -201,20 +201,24 @@ def evaluate(args, model, features, id2rel, tag="dev"):
                 'FP': metrics['fp'],
                 'FN': metrics['fn']
             })
-        # Create DataFrame and print
-        rel_df = pd.DataFrame(rel_data)
-        print(rel_df.to_string(index=False))
 
-        # Print Micro and Macro Averages with Precision and Recall
-        print(f"\n--- Aggregate Metrics ---")
+        # Create DataFrame
+        rel_df = pd.DataFrame(rel_data)
+
+        # Print DataFrame as CSV for easy copying
+        print(rel_df.to_csv(index=False)) # This is the key change
+
+        # Print Micro and Macro Averages
+        # Format them clearly for copying, also as CSV lines
+        print("--- Aggregate Metrics ---") # Keep header, but subsequent lines are pure CSV
         macro = detailed_metrics['macro_avg']
         micro = detailed_metrics['micro_avg']
-        print(f"Macro Avg Precision: {macro['precision']:.4f}")
-        print(f"Macro Avg Recall:    {macro['recall']:.4f}")
-        print(f"Macro Avg F1:        {macro['f1']:.4f}")
-        print(f"Micro Avg Precision: {micro['precision']:.4f}")
-        print(f"Micro Avg Recall:    {micro['recall']:.4f}")
-        print(f"Micro Avg F1:        {micro['f1']:.4f}")
+
+        # Print aggregate metrics as CSV rows
+        # Option 1: Simple labeled rows
+        print("Metric Type,Precision,Recall,F1") # CSV Header for aggregate section
+        print(f"Macro Avg,{macro['precision']:.4f},{macro['recall']:.4f},{macro['f1']:.4f}")
+        print(f"Micro Avg,{micro['precision']:.4f},{micro['recall']:.4f},{micro['f1']:.4f}")
 
     if args.save_attn:
         attns_path = os.path.join(args.load_path, f"{os.path.splitext(args.test_file)[0]}.attns")        

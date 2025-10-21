@@ -89,9 +89,18 @@ class DreeamInference:
         # Load configuration and tokenizer
         config = AutoConfig.from_pretrained(model_name, num_labels=num_class)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        
+
+        # Add entity marker '*' to tokenizer vocabulary
+        # This ensures the marker is treated as a single token for entity boundary detection
+        num_added = self.tokenizer.add_special_tokens({'additional_special_tokens': ['*']})
+
         # Load transformer model
         transformer_model = AutoModel.from_pretrained(model_name, config=config)
+
+        # Resize model embeddings to accommodate new token
+        if num_added > 0:
+            transformer_model.resize_token_embeddings(len(self.tokenizer))
+            print(f"✓ Added {num_added} entity marker token(s) to vocabulary (total vocab size: {len(self.tokenizer)})")
         
         # Set transformer type
         config.transformer_type = transformer_type

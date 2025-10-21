@@ -335,11 +335,21 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(
         args.tokenizer_name if args.tokenizer_name else args.model_name_or_path,
     )
+
+    # Add entity marker '*' to tokenizer vocabulary
+    # This ensures the marker is treated as a single token for entity boundary detection
+    num_added = tokenizer.add_special_tokens({'additional_special_tokens': ['*']})
+
     model = AutoModel.from_pretrained(
         args.model_name_or_path,
         from_tf=bool(".ckpt" in args.model_name_or_path),
         config=config,
     )
+
+    # Resize model embeddings to accommodate new token
+    if num_added > 0:
+        model.resize_token_embeddings(len(tokenizer))
+        print(f"✓ Added {num_added} entity marker token(s) to vocabulary (total vocab size: {len(tokenizer)})")
 
     config.transformer_type = args.transformer_type
 

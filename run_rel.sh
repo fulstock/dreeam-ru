@@ -1,13 +1,13 @@
 python3 run.py --do_train \
-    --data_dir $HOME/data/relations/NEREL/naa-docred-split-sent \
+    --data_dir $HOME/data/relations/NEREL/naa-docred-split \
     --transformer_type roberta \
     --model_name_or_path ai-forever/ruRoberta-large \
-    --display_name nerel-sent-ruroberta-fixed-lr \
-    --save_path ./logs/nerel-sent-ruroberta-fixed-lr \
+    --display_name nerel-ruroberta-fixed-lr2 \
+    --save_path ./logs/nerel-ruroberta-fixed-lr2 \
     --train_file train.json \
     --dev_file dev.json \
     --test_file test.json \
-    --train_batch_size 6 \
+    --train_batch_size 8 \
     --test_batch_size 1 \
     --gradient_accumulation_steps 4 \
     --num_labels 2 \

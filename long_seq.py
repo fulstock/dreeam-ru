@@ -57,22 +57,54 @@ def process_long_input(model, input_ids, attention_mask, start_tokens, end_token
             #     num_seg.append(3)
 
             else:
-                upper_count = (l_i - 1) // (512 - len_start - len_end) + 1
-                chunk_diff = (upper_count * 512 - l_i) // (upper_count - 1) - len_start - len_end
+                # Calculate number of chunks needed
+                # First chunk: 512 tokens, middle chunks: 512 tokens each, last chunk: overlaps with previous
+                content_per_chunk = 512 - len_start - len_end  # Available content space per middle chunk
+                remaining_after_first = l_i - (512 - len_end)  # Content after first chunk
 
-                new_input_ids.append(torch.cat([input_ids[i, :512 - len_end], end_tokens], dim=-1))
-                new_attention_mask.append(attention_mask[i, :512])
+                if remaining_after_first <= 512 - len_start:
+                    # Only need 2 chunks total
+                    chunk1 = torch.cat([input_ids[i, :512 - len_end], end_tokens], dim=-1)
+                    chunk2 = torch.cat([start_tokens, input_ids[i, (l_i - 512 + len_start): l_i]], dim=-1)
+                    new_input_ids.extend([chunk1, chunk2])
+                    new_attention_mask.extend([
+                        attention_mask[i, :512],
+                        attention_mask[i, (l_i - 512): l_i]
+                    ])
+                    num_seg.append(2)
+                else:
+                    # Need multiple chunks
+                    chunks_needed = 2  # First + last chunk
+                    remaining = remaining_after_first - (512 - len_start)  # After accounting for overlapping last chunk
+                    chunks_needed += (remaining + content_per_chunk - 1) // content_per_chunk  # Middle chunks
 
-                start_idx = 512 - len_end - chunk_diff
-                for k in range(1, upper_count - 1):
-                    new_input_ids.append(torch.cat([start_tokens, input_ids[i, start_idx : start_idx + 512 - len_start - len_end], end_tokens], dim = -1))
-                    new_attention_mask.append(F.pad(attention_mask[i, start_idx : start_idx + 512 - len_start - len_end], (len_start, len_end)))
-                    start_idx += 512 - len_start - len_end - chunk_diff
+                    # First chunk (no start tokens)
+                    chunk1 = torch.cat([input_ids[i, :512 - len_end], end_tokens], dim=-1)
+                    new_input_ids.append(chunk1)
+                    new_attention_mask.append(attention_mask[i, :512])
 
-                new_input_ids.append(torch.cat([start_tokens, input_ids[i, (l_i - 512 + len_start): l_i]], dim=-1))
-                new_attention_mask.append(attention_mask[i, (l_i - 512): l_i])
+                    current_pos = 512 - len_end
+                    for k in range(1, chunks_needed - 1):
+                        chunk_end = min(current_pos + content_per_chunk, l_i - (512 - len_start))
+                        chunk = torch.cat([
+                            start_tokens,
+                            input_ids[i, current_pos:current_pos + content_per_chunk],
+                            end_tokens
+                        ], dim=-1)
+                        mask = F.pad(
+                            attention_mask[i, current_pos:current_pos + content_per_chunk],
+                            (len_start, len_end)
+                        )
 
-                num_seg.append(upper_count)
+                        new_input_ids.append(chunk)
+                        new_attention_mask.append(mask)
+                        current_pos += content_per_chunk
+
+                    last_chunk = torch.cat([start_tokens, input_ids[i, (l_i - 512 + len_start): l_i]], dim=-1)
+                    new_input_ids.append(last_chunk)
+                    new_attention_mask.append(attention_mask[i, (l_i - 512): l_i])
+
+                    num_seg.append(chunks_needed)
                 
         input_ids = torch.stack(new_input_ids, dim=0)
         attention_mask = torch.stack(new_attention_mask, dim=0)
@@ -95,126 +127,56 @@ def process_long_input(model, input_ids, attention_mask, start_tokens, end_token
         i = 0
         new_output, new_attention = [], []
         for (n_s, l_i) in zip(num_seg, seq_len):
-            # print(sequence_output.shape) # torch.Size([4, 512, 768])
-            # print(sequence_output[i].shape) # torch.Size([512, 768])
-            # print(attention.shape) # torch.Size([4, 12, 512, 512])
-            # print(attention[i].shape) # torch.Size([12, 512, 512])
-            # if n_s == 1: # 1 segment (no split)
-            #     output = F.pad(sequence_output[i], (0, 0, 0, c - 512))
-            #     att = F.pad(attention[i], (0, c - 512, 0, c - 512))
-            #     new_output.append(output)
-            #     new_attention.append(att)
-            # elif n_s == 2: # 2 segments (splitted)
-                
-            #     # first half
-            #     output1 = sequence_output[i][:512 - len_end]
-            #     mask1 = attention_mask[i][:512 - len_end]
-            #     att1 = attention[i][:, :512 - len_end, :512 - len_end]
-            #     # pad to reserve space for the second half
-            #     output1 = F.pad(output1, (0, 0, 0, c - 512 + len_end))
-            #     mask1 = F.pad(mask1, (0, c - 512 + len_end))
-            #     att1 = F.pad(att1, (0, c - 512 + len_end, 0, c - 512 + len_end))
 
-            #     # second half
-            #     output2 = sequence_output[i + 1][len_start:]
-            #     mask2 = attention_mask[i + 1][len_start:]
-            #     att2 = attention[i + 1][:, len_start:, len_start:]
-            #     # pad to reserve space for the first half
-            #     output2 = F.pad(output2, (0, 0, l_i - 512 + len_start, c - l_i))
-            #     mask2 = F.pad(mask2, (l_i - 512 + len_start, c - l_i))
-            #     att2 = F.pad(att2, [l_i - 512 + len_start, c - l_i, l_i - 512 + len_start, c - l_i])
-                
-            #     # combine first half and second half
-            #     mask = mask1 + mask2 + 1e-10
-            #     output = (output1 + output2) / mask.unsqueeze(-1)
-            #     att = (att1 + att2)
-            #     att = att / (att.sum(-1, keepdim=True) + 1e-10)
-            #     new_output.append(output)
-            #     new_attention.append(att)
-            # elif n_s == 3:
-            #     output1 = sequence_output[i][:512]
-            #     output2 = sequence_output[i + 1][:512]
-            #     output3 = sequence_output[i + 2][len_start:]
+            # Generalized reconstruction with proper overlap handling
+            if n_s == 1:
+                output = F.pad(sequence_output[i], (0, 0, 0, c - 512))
+                att = F.pad(attention[i], (0, c - 512, 0, c - 512))
+                new_output.append(output)
+                new_attention.append(att)
+            else:
+                # Initialize output tensors
+                final_output = torch.zeros(c, sequence_output.shape[-1], device=sequence_output.device)
+                final_attention = torch.zeros(attention.shape[1], c, c, device=attention.device)
+                coverage_count = torch.zeros(c, device=sequence_output.device)
 
-            #     pad1 = c - 512
-            #     pad2 = 512
-            #     pad3 = l_i - (512 * 2) + len_start
+                # Process each chunk
+                for chunk_idx in range(n_s):
+                    if chunk_idx == 0:
+                        # First chunk: use everything except end tokens
+                        valid_tokens = 512 - len_end
+                        final_output[:valid_tokens] += sequence_output[i + chunk_idx][:valid_tokens]
+                        final_attention[:, :valid_tokens, :valid_tokens] += attention[i + chunk_idx][:, :valid_tokens, :valid_tokens]
+                        coverage_count[:valid_tokens] += 1
 
-            #     output1 = F.pad(output1, (0, 0, 0, pad1))
-            #     output2 = F.pad(output2, (0, 0, pad2, pad1 - pad2))
-            #     output3 = F.pad(output3, (0, 0, pad2 + pad3, c - l_i))
+                    elif chunk_idx == n_s - 1:
+                        # Last chunk: handle overlap
+                        start_pos = l_i - 512 + len_start
+                        end_pos = l_i
+                        chunk_start = len_start
 
-            #     mask1 = attention_mask[i][:512]
-            #     mask2 = attention_mask[i + 1][:512]
-            #     mask3 = attention_mask[i + 2][len_start:]
+                        # Add with overlap handling
+                        final_output[start_pos:end_pos] += sequence_output[i + chunk_idx][chunk_start:chunk_start + (end_pos - start_pos)]
+                        final_attention[:, start_pos:end_pos, start_pos:end_pos] += attention[i + chunk_idx][:, chunk_start:chunk_start + (end_pos - start_pos), chunk_start:chunk_start + (end_pos - start_pos)]
+                        coverage_count[start_pos:end_pos] += 1
 
-            #     mask1 = F.pad(mask1, (0, pad1))
-            #     mask2 = F.pad(mask2, (pad2, pad1 - pad2))
-            #     mask3 = F.pad(mask3, (pad2 + pad3, c - l_i))
+                    else:
+                        # Middle chunk: use content between start/end tokens
+                        content_start = 512 - len_end + (chunk_idx - 1) * content_per_chunk
+                        content_end = content_start + content_per_chunk
+                        chunk_content_start = len_start
+                        chunk_content_end = len_start + content_per_chunk
 
-            #     att1 = attention[i][:, :512, :512]
-            #     att2 = attention[i + 1][:, :512, :512]
-            #     att3 = attention[i + 2][:, len_start:, len_start:]
+                        final_output[content_start:content_end] += sequence_output[i + chunk_idx][chunk_content_start:chunk_content_end]
+                        final_attention[:, content_start:content_end, content_start:content_end] += attention[i + chunk_idx][:, chunk_content_start:chunk_content_end, chunk_content_start:chunk_content_end]
+                        coverage_count[content_start:content_end] += 1
+                        
+                coverage_count = coverage_count + 1e-10
+                final_output = final_output / coverage_count.unsqueeze(-1)
+                final_attention = final_attention / (final_attention.sum(-1, keepdim=True) + 1e-10)
 
-            #     att1 = F.pad(att1, (0, pad1, 0, pad1))
-            #     att2 = F.pad(att2, (pad2, pad1 - pad2, pad2, pad1 - pad2))
-            #     att3 = F.pad(att3, (pad2 + pad3, c - l_i, pad2 + pad3, c - l_i))
-                
-            #     mask = mask1 + mask2 + mask3 + 1e-10
-            #     output = (output1 + output2 + output3) / mask.unsqueeze(-1)
-            #     att = (att1 + att2 + att3)
-            #     att = att / (att.sum(-1, keepdim=True) + 1e-10)
-            #     new_output.append(output)
-            #     new_attention.append(att)
-            # elif n_s == 4:
-
-            #     # print(sequence_output.shape) # torch.Size([4, 512, 768])
-            #     # print(sequence_output[i].shape) # torch.Size([512, 768])
-            #     # print(attention.shape) # torch.Size([4, 12, 512, 512])
-            #     # print(attention[i].shape) # torch.Size([12, 512, 512])
-
-            #     output1 = sequence_output[i] # first 512 tokens (all)
-            #     output2 = sequence_output[i + 1] # next 512 tokens, new segment/chunk (all)
-            #     output3 = sequence_output[i + 2] # next 512 tokens, new segment/chunk (all)
-            #     output4 = sequence_output[i + 3] # last 512 tokens, new segment/chunk (all)
-
-            #     mask1 = attention_mask[i]
-            #     mask2 = attention_mask[i + 1]
-            #     mask3 = attention_mask[i + 2]
-            #     mask4 = attention_mask[i + 3]
-
-            #     att1 = attention[i]
-            #     att2 = attention[i + 1]
-            #     att3 = attention[i + 2]
-            #     att4 = attention[i + 3]
-                
-            #     mask = mask1 + mask2 + mask3 + mask4 + 1e-10
-            #     output = (output1 + output2 + output3 + output4) / mask.unsqueeze(-1)
-            #     att = (att1 + att2 + att3 + att4)
-            #     att = att / (att.sum(-1, keepdim=True) + 1e-10)
-            #     new_output.append(output)
-            #     new_attention.append(att)
-
-            # else:
-
-            outputs = [F.pad(sequence_output[i + k], (0, 0, 512 * k, c - 512 * (k + 1))) for k in range(n_s)]
-            masks = [F.pad(attention_mask[i + k], (512 * k, c - 512 * (k + 1))) for k in range(n_s)]
-            atts = [F.pad(attention[i + k], (512 * k, c - 512 * (k + 1), 512 * k, c - 512 * (k + 1))) for k in range(n_s)]
-
-            # print([o.shape for o in outputs]) # [torch.Size([512, 908])]
-            # print([o.shape for o in masks]) # [torch.Size([652])]
-            # print([o.shape for o in atts]) # [torch.Size([12, 652, 652])]
-
-            mask = sum(masks) + 1e-10
-            output = sum(outputs) / mask.unsqueeze(-1)
-            att = sum(atts)
-            att /= (att.sum(-1, keepdim=True) + 1e-10)
-
-            # print(output.shape) # torch.Size([512, 768])
-            # print(att.shape) # torch.Size([12, 512, 512])
-
-            new_output.append(output)
-            new_attention.append(att)
+                new_output.append(final_output)
+                new_attention.append(final_attention)
 
             i += n_s
             

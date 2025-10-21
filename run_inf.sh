@@ -1,14 +1,14 @@
-python3.10 run.py \
-	--data_dir other/split \
-	--transformer_type bert \
-	--model_name_or_path DeepPavlov/rubert-base-cased \
-	--display_name test5_inf \
-	--load_path ./logs/test2/2025-03-25_12-51-58.190678 \
+python3 run.py \
+	--data_dir $HOME/data/relations/NEREL/naa-docred-split \
+	--transformer_type roberta \
+	--model_name_or_path ai-forever/ruRoberta-large \
+	--display_name ruroberta-inf \
+	--load_path ./logs/nerel-ruroberta-ckpt-fix/2025-09-26_01-56-17.235907 \
 	--eval_mode single \
 	--test_file test.json \
 	--test_batch_size 1 \
 	--num_labels 2 \
 	--num_class 48 \
 	--evi_thresh 0.2 \
-	--max_seq_length 1600 \
+	--max_seq_length 1500 \
 	--max_sent_num 101

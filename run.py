@@ -157,10 +157,10 @@ def evaluate(args, model, features, id2rel, tag="dev"):
                 attn = outputs["attns"]
                 attns.extend([a.cpu().numpy() for a in attn])
     preds = np.concatenate(preds, axis=0)
-    if scores != []:
+    if len(scores) > 0:  # Fixed: use len() instead of comparing with []
         scores = np.concatenate(scores, axis=0)
         topks =  np.concatenate(topks, axis=0)
-    if evi_preds != []:
+    if len(evi_preds) > 0:  # Fixed: use len() instead of comparing with []
         evi_preds = np.concatenate(evi_preds, axis=0)
     official_results, results = to_official(id2rel, preds, features, evi_preds = evi_preds, scores = scores, topks = topks)
 

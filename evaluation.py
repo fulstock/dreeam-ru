@@ -203,8 +203,8 @@ def to_official(id2rel: dict, preds: list, features: list, evi_preds: list = [],
     res = []
 
     for i in tqdm(range(preds.shape[0]), desc="preds"): # for each entity pair
-        if scores != []:
-            score = extract_relative_score(scores[i], topks[i]) 
+        if len(scores) > 0:  # Fixed: use len() instead of comparing with []
+            score = extract_relative_score(scores[i], topks[i])
             pred = topks[i]
         else:
             pred = preds[i]
@@ -217,11 +217,11 @@ def to_official(id2rel: dict, preds: list, features: list, evi_preds: list = [],
                     't_idx': t_idx[i],
                     'r': id2rel[p],
                 }
-            if evi_preds != []:
+            if len(evi_preds) > 0:  # Fixed: use len() instead of comparing with []
                 curr_evi = evi_preds[i]
-                evis = np.nonzero(curr_evi)[0].tolist() 
+                evis = np.nonzero(curr_evi)[0].tolist()
                 curr_result["evidence"] = [evi for evi in evis if evi < sents[i]]
-            if scores != []:
+            if len(scores) > 0:  # Fixed: use len() instead of comparing with []
                 curr_result["score"] = score[np.where(topks[i] == p)].item()
             if p != 0 and p in np.nonzero(preds[i])[0].tolist():
                 official_res.append(curr_result)

@@ -100,9 +100,10 @@ class DreeamInference:
         
         # Create DocRE model
         self.model = DocREModel(
-            config, 
-            transformer_model, 
+            config,
+            transformer_model,
             self.tokenizer,
+            emb_size=config.hidden_size,  # Explicit: use backbone's hidden size
             num_labels=self.num_labels,
             max_sent_num=self.max_sent_num,
             evi_thresh=self.evi_thresh

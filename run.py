@@ -350,8 +350,9 @@ def main():
     config.sep_token_id = tokenizer.sep_token_id
 
     model = DocREModel(config, model, tokenizer,
+                    emb_size=config.hidden_size,  # Explicit: use backbone's hidden size
                     num_labels=args.num_labels,
-                    max_sent_num=args.max_sent_num, 
+                    max_sent_num=args.max_sent_num,
                     evi_thresh=args.evi_thresh)
     model.to(args.device)
 

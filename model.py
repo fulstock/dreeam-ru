@@ -10,30 +10,43 @@ from losses import ATLoss
 class DocREModel(nn.Module):
 
     def __init__(self, config, model, tokenizer,
-                emb_size=768, block_size=64, num_labels=-1,
+                emb_size=None, block_size=64, num_labels=-1,
                 max_sent_num=25, evi_thresh=0.2):
         '''
         Initialize the model.
         :model: Pretrained langage model encoder;
         :tokenizer: Tokenzier corresponding to the pretrained language model encoder;
-        :emb_size: Dimension of embeddings for subject/object (head/tail) representations;
+        :emb_size: Dimension of embeddings for subject/object (head/tail) representations.
+                   If None, automatically set to match config.hidden_size for optimal performance.
         :block_size: Number of blocks for grouped bilinear classification;
         :num_labels: Maximum number of relation labels for each entity pair;
         :max_sent_num: Maximum number of sentences for each document;
         :evi_thresh: Threshold for selecting evidence sentences.
         '''
-        
+
         super().__init__()
         self.config = config
         self.model = model
         self.tokenizer = tokenizer
         self.hidden_size = config.hidden_size
 
+        # Auto-set emb_size to match hidden_size if not specified
+        # This ensures optimal performance for different backbone models
+        # (e.g., BERT-base: 768, RoBERTa-large: 1024)
+        if emb_size is None:
+            emb_size = self.hidden_size
+
+        # Validate that emb_size is divisible by block_size
+        # This is required for the grouped bilinear classification
+        assert emb_size % block_size == 0, \
+            f"emb_size ({emb_size}) must be divisible by block_size ({block_size}). " \
+            f"Current hidden_size is {self.hidden_size}."
+
         self.loss_fnt = ATLoss()
         self.loss_fnt_evi = nn.KLDivLoss(reduction="batchmean")
 
         self.head_extractor = nn.Linear(self.hidden_size * 2, emb_size)
-        self.tail_extractor = nn.Linear(self.hidden_size * 2, emb_size)     
+        self.tail_extractor = nn.Linear(self.hidden_size * 2, emb_size)
 
         self.bilinear = nn.Linear(emb_size * block_size, config.num_labels)
 

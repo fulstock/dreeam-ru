@@ -1,5 +1,5 @@
 python3 run.py --do_train \
-    --data_dir $HOME/data/relations/NEREL/naa-docred-split-sent \
+    --data_dir $HOME/data/relations/NEREL/naa-docred-split \
     --transformer_type roberta \
     --model_name_or_path ai-forever/ruRoberta-large \
     --display_name nerel-sent-ruroberta-alexey-config \

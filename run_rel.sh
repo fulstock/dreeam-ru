@@ -7,7 +7,7 @@ python3 run.py --do_train \
     --train_file train.json \
     --dev_file dev.json \
     --test_file test.json \
-    --train_batch_size 2 \
+    --train_batch_size 1 \
     --test_batch_size 1 \
     --gradient_accumulation_steps 1 \
     --num_labels 2 \

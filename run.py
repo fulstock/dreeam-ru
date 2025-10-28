@@ -167,7 +167,7 @@ def evaluate(args, model, features, id2rel, tag="dev"):
     detailed_metrics = None  # Initialize variable for detailed metrics
     if len(official_results) > 0:
         if tag == "test":
-            if args.do_train and args.train_file:
+            if args.train_file:  # Removed args.do_train check - evaluate test set during inference too
                 best_re, best_evi, best_re_ign, detailed_metrics = official_evaluate(official_results, args.data_dir, args.train_file, args.test_file)
             else:
                 best_re = best_evi = best_re_ign = [0, 0, 0]

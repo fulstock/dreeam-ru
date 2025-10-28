@@ -3,12 +3,12 @@ python3 run.py \
 	--transformer_type roberta \
 	--model_name_or_path ai-forever/ruRoberta-large \
 	--display_name ruroberta-inf \
-	--load_path ./logs/nerel-ruroberta-ckpt-fix/2025-09-26_01-56-17.235907 \
+	--load_path ./logs/nerel-ruroberta-ckpt/2025-09-26_00-47-57.793083 \
 	--eval_mode single \
 	--test_file test.json \
 	--test_batch_size 1 \
 	--num_labels 2 \
 	--num_class 48 \
 	--evi_thresh 0.2 \
-	--max_seq_length 1500 \
+	--max_seq_length 1460 \
 	--max_sent_num 101

@@ -19,6 +19,6 @@ python3 run.py --do_train \
     --num_train_epochs 40 \
     --seed 7777 \
     --num_class 48 \
-    --max_seq_length 256 \
+    --max_seq_length 550 \
     --max_sent_num 1 \
     --eval_mode single

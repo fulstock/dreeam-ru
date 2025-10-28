@@ -6,3 +6,6 @@ meta/*
 wandb/*
 __pycache__/*
 logs/
+*.ckpt
+*.csv
+*.json

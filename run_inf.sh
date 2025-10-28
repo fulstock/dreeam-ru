@@ -3,7 +3,7 @@ python3 run.py \
 	--transformer_type roberta \
 	--model_name_or_path ai-forever/ruRoberta-large \
 	--display_name ruroberta-inf \
-	--load_path ./logs/nerel-ruroberta-ckpt/2025-09-26_00-47-57.793083 \
+	--load_path ./logs/nerel-ruroberta-alexey-config/2025-10-27_15-34-06.802622 \
 	--eval_mode single \
 	--test_file test.json \
 	--test_batch_size 1 \

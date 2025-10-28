@@ -1,9 +1,9 @@
 python3 run.py --do_train \
-    --data_dir $HOME/data/relations/NEREL/naa-docred-split \
+    --data_dir $HOME/data/relations/NEREL/naa-docred-split-sent \
     --transformer_type roberta \
     --model_name_or_path ai-forever/ruRoberta-large \
-    --display_name nerel-sent-ruroberta-alexey-config \
-    --save_path ./logs/nerel-sent-ruroberta-alexey-config \
+    --display_name nerel-sent-ruroberta \
+    --save_path ./logs/nerel-sent-ruroberta \
     --train_file train.json \
     --dev_file dev.json \
     --test_file test.json \

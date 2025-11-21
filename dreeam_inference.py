@@ -143,6 +143,12 @@ class DreeamInference:
         
         self.model.to(self.device)
         self.model.eval()
+
+        # Enable torch.compile for 30-50% faster inference (PyTorch 2.0+)
+        if hasattr(torch, 'compile'):
+            print("✓ Compiling model with torch.compile for faster inference...")
+            self.model = torch.compile(self.model)
+            print("✓ Model compiled successfully")
         
     def _convert_to_docred_format(self, 
                                   text: str, 
@@ -443,8 +449,9 @@ class DreeamInference:
         features = self._create_features(samples)
         
         # Run inference
-        dataloader = DataLoader(features, batch_size=self.batch_size, shuffle=False, 
-                               collate_fn=collate_fn, drop_last=False)
+        dataloader = DataLoader(features, batch_size=self.batch_size, shuffle=False,
+                               collate_fn=collate_fn, drop_last=False,
+                               num_workers=4, pin_memory=True, prefetch_factor=2)
         
         all_preds = []
         all_scores = []

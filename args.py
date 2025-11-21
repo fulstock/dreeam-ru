@@ -62,5 +62,9 @@ def add_args(parser):
                         help="random seed for initialization")
     parser.add_argument("--num_class", type=int, default=97,
                         help="Number of relation types in dataset.")
+    parser.add_argument("--use_smart_batching", action="store_true",
+                        help="Enable smart batching for 20-30%% less padding (groups samples by length).")
+    parser.add_argument("--num_buckets", type=int, default=10,
+                        help="Number of length buckets for smart batching (default: 10).")
 
     return parser

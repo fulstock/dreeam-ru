@@ -4,14 +4,14 @@ import torch.nn as nn
 from opt_einsum import contract
 import torch.nn.functional as F
 from long_seq import process_long_input
-from losses import ATLoss
+from losses import ATLoss, EnhancedAMTLoss
 
 
 class DocREModel(nn.Module):
 
     def __init__(self, config, model, tokenizer,
                 emb_size=None, block_size=64, num_labels=-1,
-                max_sent_num=25, evi_thresh=0.2):
+                max_sent_num=25, evi_thresh=0.2, loss_fnt=None):
         '''
         Initialize the model.
         :model: Pretrained langage model encoder;
@@ -42,7 +42,8 @@ class DocREModel(nn.Module):
             f"emb_size ({emb_size}) must be divisible by block_size ({block_size}). " \
             f"Current hidden_size is {self.hidden_size}."
 
-        self.loss_fnt = ATLoss()
+        # Use provided loss function or default to ATLoss
+        self.loss_fnt = loss_fnt if loss_fnt is not None else ATLoss()
         self.loss_fnt_evi = nn.KLDivLoss(reduction="batchmean")
 
         self.head_extractor = nn.Linear(self.hidden_size * 2, emb_size)
@@ -310,11 +311,12 @@ class DocREModel(nn.Module):
             scores_topk = self.loss_fnt.get_score(logits, self.num_labels)
             output["scores"] = scores_topk[0]
             output["topks"] = scores_topk[1]
-        
+            output["logits"] = logits  # Include logits for per-class threshold optimization
+
         if tag == "infer": # teacher model inference
             output["attns"] = doc_attn.split(batch_rel)
 
-        else: # training
+        if tag == "train" and labels is not None: # training (only compute loss during training)
             # relation extraction loss
             loss = self.loss_fnt(logits.float(), labels.float())
             output["loss"] = {"rel_loss": loss.to(sequence_output)}

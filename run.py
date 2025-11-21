@@ -13,8 +13,9 @@ from transformers.optimization import AdamW, get_linear_schedule_with_warmup
 from args import add_args
 from model import DocREModel
 from utils import set_seed, collate_fn, create_directory
-from prepro import read_docred
-from evaluation import to_official, official_evaluate, merge_results
+from prepro import read_docred, negative_sampling, compute_relation_frequencies
+from evaluation import to_official, official_evaluate, merge_results, optimize_per_class_thresholds, save_optimized_thresholds, load_optimized_thresholds, apply_per_class_thresholds
+from losses import EnhancedAMTLoss, ATLoss
 import wandb
 from tqdm import tqdm
 
@@ -68,7 +69,7 @@ def train(args, model, train_features, dev_features, id2rel):
                 optimizer.zero_grad()
                 model.train()
 
-                inputs = load_input(batch, args.device)  
+                inputs = load_input(batch, args.device, tag="train")
                 outputs = model(**inputs)
                 loss = [outputs["loss"]["rel_loss"]]
 
@@ -141,12 +142,41 @@ def train(args, model, train_features, dev_features, id2rel):
     set_seed(args)
     model.zero_grad()
     finetune(train_features, optimizer, args.num_train_epochs, num_steps, id2rel)
+    # Optimize per-class thresholds after training if enabled
+    if args.use_per_class_thresholds:
+        print("\n=== Optimizing Per-Class Thresholds ===")
+        print("Loading best model checkpoint...")
+        best_model_path = os.path.join(args.save_path, "best.ckpt")
+        model.load_state_dict(torch.load(best_model_path))
 
-def evaluate(args, model, features, id2rel, tag="dev"):
+        dev_dataloader = DataLoader(dev_features, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False, num_workers=4, pin_memory=True, prefetch_factor=2)
+
+        optimized_thresholds = optimize_per_class_thresholds(
+            model=model,
+            dev_dataloader=dev_dataloader,
+            id2rel=id2rel,
+            device=args.device,
+            threshold_range=(args.threshold_range_min, args.threshold_range_max),
+            threshold_step=args.threshold_step
+        )
+
+        # Save optimized thresholds
+        threshold_path = os.path.join(args.save_path, "optimized_thresholds.json")
+        save_optimized_thresholds(optimized_thresholds, threshold_path)
+        print(f"✓ Optimized thresholds saved to {threshold_path}")
+
+        # Calculate and print average F1
+        if optimized_thresholds:
+            avg_f1 = sum(info['f1'] for info in optimized_thresholds.values()) / len(optimized_thresholds)
+            print(f"  Average F1 across all classes: {avg_f1*100:.2f}%")
+
+def evaluate(args, model, features, id2rel, tag="dev", optimized_thresholds=None):
     dataloader = DataLoader(features, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False, num_workers=4, pin_memory=True, prefetch_factor=2)
     preds, evi_preds = [], []
     scores, topks = [], []
     attns = []
+    logits_all = []  # Collect logits for per-class threshold application
+
     for batch in tqdm(dataloader, desc=f"Evaluating batches"):
         model.eval()
         if args.save_attn:
@@ -154,6 +184,11 @@ def evaluate(args, model, features, id2rel, tag="dev"):
         inputs = load_input(batch, args.device, tag)
         with torch.no_grad():
             outputs = model(**inputs)
+
+            # If using optimized thresholds, collect logits instead of predictions
+            if optimized_thresholds is not None:
+                logits_all.append(outputs["logits"].cpu())  # Assuming model outputs logits
+
             pred = outputs["rel_pred"]
             pred = pred.cpu().numpy()
             pred[np.isnan(pred)] = 0
@@ -168,12 +203,53 @@ def evaluate(args, model, features, id2rel, tag="dev"):
             if "attns" in outputs: # attention recorded
                 attn = outputs["attns"]
                 attns.extend([a.cpu().numpy() for a in attn])
+
+    # Apply per-class thresholds if provided
+    if optimized_thresholds is not None and len(logits_all) > 0:
+        print("\n=== Applying Per-Class Thresholds ===")
+        logits_concat = torch.cat(logits_all, dim=0)
+        preds_optimized = apply_per_class_thresholds(
+            logits_concat,
+            optimized_thresholds,
+            num_labels=args.num_labels
+        )
+        preds = [preds_optimized.cpu().numpy()]
+        print(f"✓ Applied optimized thresholds to {logits_concat.shape[0]} predictions")
+
     preds = np.concatenate(preds, axis=0)
-    if scores != []:
+    if len(scores) > 0:
         scores = np.concatenate(scores, axis=0)
         topks =  np.concatenate(topks, axis=0)
-    if evi_preds != []:
+    if len(evi_preds) > 0:
         evi_preds = np.concatenate(evi_preds, axis=0)
+
+    # Check if features are chunked (have entity_map field)
+    if len(features) > 0 and 'entity_map' in features[0]:
+        print(f"\n=== Merging {len(features)} chunk predictions ===")
+        from evaluation import merge_chunk_predictions
+
+        # Prepare scores for merging (convert to list of arrays per feature)
+        scores_list = []
+        if len(scores) > 0:
+            # Assume scores are parallel to predictions
+            for i in range(len(preds)):
+                scores_list.append(scores[i] if i < len(scores) else None)
+        else:
+            scores_list = None
+
+        # Merge chunks back to original documents
+        merged_features, merged_preds, merged_scores = merge_chunk_predictions(
+            features, preds, scores_list
+        )
+
+        print(f"✓ Merged to {len(merged_features)} original documents")
+
+        # Replace with merged versions
+        features = merged_features
+        preds = np.concatenate(merged_preds, axis=0) if len(merged_preds) > 0 else preds
+        if merged_scores is not None and len(merged_scores) > 0:
+            scores = np.concatenate(merged_scores, axis=0)
+
     official_results, results = to_official(id2rel, preds, features, evi_preds = evi_preds, scores = scores, topks = topks)
 
     detailed_metrics = None  # Initialize variable for detailed metrics
@@ -357,15 +433,35 @@ def main():
 
     set_seed(args)
     
-    read = read_docred    
+    read = read_docred
     config.cls_token_id = tokenizer.cls_token_id
     config.sep_token_id = tokenizer.sep_token_id
+
+    # Initialize loss function based on args
+    if args.use_amtl:
+        print("\n=== Using Enhanced AMTL Loss ===")
+        print(f"  num_segments: {args.num_segments}")
+        print(f"  lambda_weight: {args.lambda_weight}")
+        print(f"  use_effective_number: {args.use_effective_number}")
+        print(f"  beta: {args.beta}")
+
+        loss_fnt = EnhancedAMTLoss(
+            num_classes=args.num_class,
+            num_segments=args.num_segments,
+            lambda_weight=args.lambda_weight,
+            use_effective_number=args.use_effective_number,
+            beta=args.beta
+        )
+    else:
+        print("\n=== Using Standard ATLoss ===")
+        loss_fnt = ATLoss()
 
     model = DocREModel(config, model, tokenizer,
                     emb_size=config.hidden_size,  # Explicit: use backbone's hidden size
                     num_labels=args.num_labels,
                     max_sent_num=args.max_sent_num,
-                    evi_thresh=args.evi_thresh)
+                    evi_thresh=args.evi_thresh,
+                    loss_fnt=loss_fnt)
     model.to(args.device)
 
     # Enable torch.compile for 30-50% faster inference (PyTorch 2.0+)
@@ -390,8 +486,24 @@ def main():
         train_file = os.path.join(args.data_dir, args.train_file)
         dev_file = os.path.join(args.data_dir, args.dev_file)
 
-        train_features = read(args.data_dir, train_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length, teacher_sig_path=args.teacher_sig_path)
-        dev_features = read(args.data_dir, dev_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length)
+        train_features = read(args.data_dir, train_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length, teacher_sig_path=args.teacher_sig_path, use_chunking=args.use_chunking, chunk_size=args.chunk_size, chunk_overlap=args.chunk_overlap, max_sent_num=args.max_sent_num)
+        dev_features = read(args.data_dir, dev_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length, use_chunking=args.use_chunking, chunk_size=args.chunk_size, chunk_overlap=args.chunk_overlap, max_sent_num=args.max_sent_num)
+
+        # Apply negative sampling if enabled
+        if args.use_negative_sampling:
+            print(f"\n=== Applying Negative Sampling (ratio {args.neg_pos_ratio}:1) ===")
+            train_features = negative_sampling(
+                train_features,
+                neg_pos_ratio=args.neg_pos_ratio,
+                seed=args.seed
+            )
+
+        # Compute relation frequencies and initialize AMTL if enabled
+        if args.use_amtl:
+            print("\n=== Computing Relation Frequencies for AMTL ===")
+            relation_frequencies = compute_relation_frequencies(train_features, num_classes=args.num_class)
+            model.loss_fnt.set_relation_frequencies(relation_frequencies)
+            print("✓ AMTL loss initialized with relation frequencies")
 
         train(args, model, train_features, dev_features, id2rel)
 
@@ -399,14 +511,26 @@ def main():
 
         basename = os.path.splitext(args.test_file)[0]
         test_file = os.path.join(args.data_dir, args.test_file)
-        
-        test_features = read(args.data_dir, test_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length)
+
+        test_features = read(args.data_dir, test_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length, use_chunking=args.use_chunking, chunk_size=args.chunk_size, chunk_overlap=args.chunk_overlap, max_sent_num=args.max_sent_num)
+
+        # Load optimized thresholds if they exist and per-class thresholds are enabled
+        optimized_thresholds = None
+        if args.use_per_class_thresholds:
+            threshold_path = os.path.join(args.load_path, "optimized_thresholds.json")
+            if os.path.exists(threshold_path):
+                print(f"\n=== Loading Optimized Per-Class Thresholds ===")
+                optimized_thresholds = load_optimized_thresholds(threshold_path)
+                print(f"✓ Loaded optimized thresholds from {threshold_path}")
+            else:
+                print(f"⚠ Warning: --use_per_class_thresholds enabled but no optimized_thresholds.json found in {args.load_path}")
+                print(f"  Will use standard threshold from loss function")
 
         # print(test_features[0]['sent_labels'])
-        
+
         if args.eval_mode != "fushion":
 
-            test_scores, test_output, official_results, results, detailed_metrics = evaluate(args, model, test_features, id2rel, tag="test")  
+            test_scores, test_output, official_results, results, detailed_metrics = evaluate(args, model, test_features, id2rel, tag="test", optimized_thresholds=optimized_thresholds)
             # wandb.log(test_scores)
 
             offi_path = os.path.join(args.load_path, args.pred_file)

@@ -16,22 +16,14 @@ python3 run.py --do_train \
     --evi_thresh 0.2 \
     --evi_lambda 0.05 \
     --warmup_ratio 0.06 \
-    --num_train_epochs 320 \
+    --num_train_epochs 160 \
     --seed 7777 \
     --num_class 48 \
     --max_seq_length 1460 \
     --max_sent_num 101 \
     --eval_mode single \
-    --use_smart_batching \
-    --num_buckets 10 \
-    --num_segments 4 \
+    --num_segments 2 \
     --use_amtl \
-    --lambda_weight 3.5 \
+    --lambda_weight 1.5 \
     --use_effective_number \
-    --beta 0.9999 \
-    --use_negative_sampling \
-    --neg_pos_ratio 3.0 \
-    --use_per_class_thresholds \
-    --threshold_range_min 0.1 \
-    --threshold_range_max 0.95 \
-    --threshold_step 0.05
+    --beta 0.999

@@ -1,9 +1,9 @@
 python3 run.py --do_train \
-    --data_dir $HOME/data/relations/NEREL/naa-docred-split-sent \
+    --data_dir $HOME/data/relations/NEREL/naa-docred-split \
     --transformer_type roberta \
     --model_name_or_path ai-forever/ruRoberta-large \
-    --display_name nerel-sent-ruroberta \
-    --save_path ./logs/nerel-sent-ruroberta \
+    --display_name nerel-ruroberta-optimized \
+    --save_path ./logs/nerel-ruroberta-optimized \
     --train_file train.json \
     --dev_file dev.json \
     --test_file test.json \
@@ -16,9 +16,22 @@ python3 run.py --do_train \
     --evi_thresh 0.2 \
     --evi_lambda 0.05 \
     --warmup_ratio 0.06 \
-    --num_train_epochs 160 \
+    --num_train_epochs 320 \
     --seed 7777 \
     --num_class 48 \
     --max_seq_length 1460 \
     --max_sent_num 101 \
-    --eval_mode single
+    --eval_mode single \
+    --use_smart_batching \
+    --num_buckets 10 \
+    --num_segments 4 \
+    --use_amtl \
+    --lambda_weight 3.5 \
+    --use_effective_number \
+    --beta 0.9999 \
+    --use_negative_sampling \
+    --neg_pos_ratio 3.0 \
+    --use_per_class_thresholds \
+    --threshold_range_min 0.1 \
+    --threshold_range_max 0.95 \
+    --threshold_step 0.05

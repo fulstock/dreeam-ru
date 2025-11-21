@@ -44,6 +44,17 @@ def train(args, model, train_features, dev_features, id2rel):
     def finetune(features, optimizer, num_epoch, num_steps, id2rel):
         best_score = -1
 
+        # Create training log file
+        log_file = os.path.join(args.save_path, "training_log.txt")
+        log_f = open(log_file, "w", buffering=1)  # Line buffering
+        print(f"✓ Logging training to {log_file}")
+
+        def log_print(msg):
+            """Print to both console and log file"""
+            print(msg)
+            log_f.write(msg + "\n")
+            log_f.flush()
+
         # Use smart batching if enabled (20-30% less padding)
         if args.use_smart_batching:
             from smart_batching import create_smart_dataloader
@@ -61,9 +72,13 @@ def train(args, model, train_features, dev_features, id2rel):
         warmup_steps = int(total_steps * args.warmup_ratio)
         scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=warmup_steps, num_training_steps=total_steps)
         scaler = GradScaler()
-        print("Total steps: {}".format(total_steps))
-        print("Warmup steps: {}".format(warmup_steps))
-        for epoch in tqdm(train_iterator, desc='Train epoch'):
+        log_print("Total steps: {}".format(total_steps))
+        log_print("Warmup steps: {}".format(warmup_steps))
+
+        # Create progress bar for steps (not epochs)
+        pbar = tqdm(total=total_steps, desc='Training')
+
+        for epoch in train_iterator:
             for step, batch in enumerate(train_dataloader):
                 model.zero_grad()
                 optimizer.zero_grad()
@@ -91,17 +106,29 @@ def train(args, model, train_features, dev_features, id2rel):
                     scheduler.step()
                     model.zero_grad()
                     num_steps += 1
-                    
+
+                    # Update progress bar with detailed info
+                    loss_val = loss.item() * args.gradient_accumulation_steps
+                    pbar.update(1)
+                    pbar.set_postfix({
+                        'epoch': f'{epoch+1}/{num_epoch}',
+                        'loss': f'{loss_val:.4f}',
+                        'lr': f'{scheduler.get_last_lr()[0]:.2e}'
+                    })
+
                 # wandb.log(outputs["loss"], step=num_steps)
 
                 best_offi_results = None
                 
                 if (step + 1) == len(train_dataloader) or (args.evaluation_steps > 0 and num_steps % args.evaluation_steps == 0 and (step + 1) % args.gradient_accumulation_steps == 0):
-                    
+
+                    pbar.set_description(f'Evaluating epoch {epoch+1}')
                     dev_scores, dev_output, official_results, results, _ = evaluate(args, model, dev_features, id2rel, tag="dev")
                     # wandb.log(dev_scores, step=num_steps)
-                    
-                    print(dev_output)
+                    pbar.set_description('Training')
+
+                    log_print(f"\n=== Epoch {epoch+1}/{num_epoch} Evaluation ===")
+                    log_print(dev_output)
                     if dev_scores["dev_F1_ign"] > best_score:
                         best_score = dev_scores["dev_F1_ign"]
                         best_offi_results = official_results
@@ -109,15 +136,35 @@ def train(args, model, train_features, dev_features, id2rel):
                         best_output = dev_output
 
                         ckpt_file = os.path.join(args.save_path, "best.ckpt")
-                        print(f"saving model checkpoint into {ckpt_file} ...")
+                        log_print(f"saving model checkpoint into {ckpt_file} ...")
                         torch.save(model.state_dict(), ckpt_file)
-                        
+
+                        # Save intermediate logs when best model is updated
+                        pred_file = os.path.join(args.save_path, args.pred_file)
+                        score_file = os.path.join(args.save_path, "scores.csv")
+                        results_file = os.path.join(args.save_path, f"topk_{args.pred_file}")
+                        dump_to_file(best_offi_results, pred_file, best_output, score_file, best_results, results_file)
+                        log_print(f"✓ Saved intermediate results at epoch {epoch+1}, F1_ign: {best_score:.4f}")
+
+                    # Save epoch checkpoint every 10 epochs
+                    if (epoch + 1) % 10 == 0:
+                        epoch_ckpt = os.path.join(args.save_path, f"epoch_{epoch+1}.ckpt")
+                        log_print(f"saving epoch checkpoint into {epoch_ckpt} ...")
+                        torch.save(model.state_dict(), epoch_ckpt)
+
+                        # Save current epoch results
+                        epoch_pred_file = os.path.join(args.save_path, f"epoch_{epoch+1}_{args.pred_file}")
+                        epoch_score_file = os.path.join(args.save_path, f"epoch_{epoch+1}_scores.csv")
+                        epoch_results_file = os.path.join(args.save_path, f"epoch_{epoch+1}_topk_{args.pred_file}")
+                        dump_to_file(official_results, epoch_pred_file, dev_output, epoch_score_file, results, epoch_results_file)
+                        log_print(f"✓ Saved epoch {epoch+1} results, current F1_ign: {dev_scores['dev_F1_ign']:.4f}")
+
                     if epoch == train_iterator[-1]: # last epoch
 
                         ckpt_file = os.path.join(args.save_path, "last.ckpt")
                         print(f"saving model checkpoint into {ckpt_file} ...")
                         torch.save(model.state_dict(), ckpt_file)
-                        
+
                         pred_file = os.path.join(args.save_path, args.pred_file)
                         score_file = os.path.join(args.save_path, "scores.csv")
                         results_file = os.path.join(args.save_path, f"topk_{args.pred_file}")
@@ -127,7 +174,11 @@ def train(args, model, train_features, dev_features, id2rel):
                             best_output = dev_output
                             best_results = results
                         dump_to_file(best_offi_results, pred_file, best_output, score_file, best_results, results_file)
-                     
+                        log_print(f"✓ Saved final results")
+
+        pbar.close()
+        log_print("\n=== Training Complete ===")
+        log_f.close()
 
         return num_steps
 

@@ -57,7 +57,7 @@ def train(args, model, train_features, dev_features, id2rel):
                 optimizer.zero_grad()
                 model.train()
 
-                inputs = load_input(batch, args.device)  
+                inputs = load_input(batch, args.device, tag="train")
                 outputs = model(**inputs)
                 loss = [outputs["loss"]["rel_loss"]]
 

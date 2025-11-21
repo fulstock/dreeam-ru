@@ -10,6 +10,14 @@
 	"max_sent_num": 101,
 	"batch_size": 4,
 
+	"# Document Chunking": "For processing long documents (>1460 tokens)",
+	"use_chunking": false,
+	"chunk_size": 512,
+	"chunk_overlap": 128,
+
+	"# Per-Class Thresholds": "Path to optimized thresholds (optional)",
+	"optimized_thresholds": null,
+
 	"# Class Imbalance Handling": "Parameters for AMTL loss and sampling techniques",
 	"use_amtl": false,
 	"num_segments": 4,

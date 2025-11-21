@@ -8,7 +8,8 @@ from torch.utils.data import DataLoader
 
 from model import DocREModel
 from utils import collate_fn
-from evaluation import to_official
+from evaluation import to_official, load_optimized_thresholds, apply_per_class_thresholds, merge_chunk_predictions
+from prepro import chunk_document
 
 
 class DreeamInference:
@@ -51,6 +52,14 @@ class DreeamInference:
         self.evi_thresh = self.config_data.get("evi_thresh", 0.2)
         self.num_labels = self.config_data.get("num_labels", 4)
         self.batch_size = self.config_data.get("batch_size", 8)
+
+        # Chunking parameters (for long documents)
+        self.use_chunking = self.config_data.get("use_chunking", False)
+        self.chunk_size = self.config_data.get("chunk_size", 512)
+        self.chunk_overlap = self.config_data.get("chunk_overlap", 128)
+
+        # Per-class thresholds (loaded later after rel2id is available)
+        self.optimized_thresholds = None
         
         # Load relation mappings
         rel2id_path = self.config_data.get("rel2id", "rel2id.json")
@@ -158,7 +167,33 @@ class DreeamInference:
             print("✓ Compiling model with torch.compile for faster inference...")
             self.model = torch.compile(self.model)
             print("✓ Model compiled successfully")
-        
+
+        # Load per-class thresholds if available
+        self._load_optimized_thresholds()
+
+    def _load_optimized_thresholds(self):
+        """Load per-class optimized thresholds if available."""
+        # Try to load from config first
+        threshold_path = self.config_data.get("optimized_thresholds")
+
+        # If not in config, try default location in model directory
+        if not threshold_path:
+            threshold_path = os.path.join(self.model_path, "optimized_thresholds.json")
+
+        # Make path absolute if relative
+        if threshold_path and not os.path.isabs(threshold_path):
+            threshold_path = os.path.join(os.path.dirname(self.model_path), threshold_path)
+
+        # Load thresholds if file exists
+        if threshold_path and os.path.exists(threshold_path):
+            self.optimized_thresholds = load_optimized_thresholds(threshold_path)
+            print(f"✓ Loaded optimized thresholds from: {threshold_path}")
+            print(f"  Per-class thresholds available for {len(self.optimized_thresholds)} relation types")
+        else:
+            self.optimized_thresholds = None
+            if self.config_data.get("optimized_thresholds"):
+                print(f"Warning: Optimized thresholds not found at: {threshold_path}")
+
     def _convert_to_docred_format(self, 
                                   text: str, 
                                   entities: List[Dict],
@@ -346,27 +381,88 @@ class DreeamInference:
         for sample_idx, sample in enumerate(samples):
             # Add entity markers
             sents, sent_map, sent_pos = self._add_entity_markers(sample)
-            
+
+            # Check if document needs chunking
+            if self.use_chunking and len(sents) > self.chunk_size:
+                print(f'Chunking document "{sample["title"][:50]}..." ({len(sents)} tokens) into chunks of {self.chunk_size} with overlap {self.chunk_overlap}')
+
+                # First, build entity_pos and train_triple for chunk_document
+                entity_pos_temp = []
+                for entity in sample['vertexSet']:
+                    current_entity_pos = []
+                    for mention in entity:
+                        sent_id = mention["sent_id"]
+                        pos = mention["pos"]
+                        if (sent_id < len(sent_map) and
+                            pos[0] in sent_map[sent_id] and
+                            pos[1] in sent_map[sent_id]):
+                            start = sent_map[sent_id][pos[0]]
+                            end = sent_map[sent_id][pos[1]]
+                            if start < end:
+                                current_entity_pos.append((start, end))
+                    if current_entity_pos:
+                        entity_pos_temp.append(current_entity_pos)
+
+                # Create dummy train_triple (not used in inference but needed for chunk_document)
+                train_triple = {}
+
+                # Call chunk_document from prepro.py
+                chunks = chunk_document(
+                    sents=sents,
+                    entity_pos=entity_pos_temp,
+                    train_triple=train_triple,
+                    sent_pos=sent_pos,
+                    sample=sample,
+                    chunk_size=self.chunk_size,
+                    chunk_overlap=self.chunk_overlap,
+                    docred_rel2id=self.rel2id,
+                    max_sent_num=self.max_sent_num
+                )
+
+                if chunks is not None:
+                    # Convert chunks to features
+                    for chunk in chunks:
+                        chunk_input_ids = self.tokenizer.convert_tokens_to_ids(chunk['chunk_tokens'])
+                        chunk_input_ids = self.tokenizer.build_inputs_with_special_tokens(chunk_input_ids)
+
+                        # Create dummy labels
+                        labels = [[1] + [0] * (len(self.rel2id) - 1) for _ in chunk['chunk_hts']]
+
+                        chunk_feature = {
+                            'input_ids': chunk_input_ids,
+                            'entity_pos': chunk['chunk_entity_pos'],
+                            'labels': labels,
+                            'hts': chunk['chunk_hts'],
+                            'sent_pos': chunk['chunk_sent_pos'],
+                            'sent_labels': None,
+                            'title': sample['title'],
+                            'entity_map': chunk['entity_map'],  # Important: mark as chunked
+                            'original_title': sample['title']
+                        }
+                        features.append(chunk_feature)
+                    continue  # Skip normal processing for this sample
+
+            # Normal processing (no chunking)
             # Truncate if too long
             if len(sents) > self.max_seq_length - 2:
                 sents = sents[:self.max_seq_length - 2]
-            
+
             # Convert to input IDs
             input_ids = self.tokenizer.convert_tokens_to_ids(sents)
             input_ids = self.tokenizer.build_inputs_with_special_tokens(input_ids)
-            
+
             # Create entity positions
             entity_pos = []
             valid_entities = []
-            
+
             for entity_idx, entity in enumerate(sample['vertexSet']):
                 current_entity_pos = []
                 for mention in entity:
                     sent_id = mention["sent_id"]
                     pos = mention["pos"]
                     # Check bounds more carefully
-                    if (sent_id < len(sent_map) and 
-                        pos[0] in sent_map[sent_id] and 
+                    if (sent_id < len(sent_map) and
+                        pos[0] in sent_map[sent_id] and
                         pos[1] in sent_map[sent_id] and
                         len(pos) >= 2):
                         start = sent_map[sent_id][pos[0]]
@@ -374,31 +470,31 @@ class DreeamInference:
                         # Ensure start < end and within bounds
                         if start < end and start < len(input_ids) and end <= len(input_ids):
                             current_entity_pos.append((start, end))
-                
+
                 # Only add entities that have valid positions
                 if current_entity_pos:
                     entity_pos.append(current_entity_pos)
                     valid_entities.append(entity_idx)
-            
+
             # Create all possible entity pairs for inference (only between valid entities)
             hts = []
             num_valid_entities = len(entity_pos)
-            
+
             if num_valid_entities > 1:  # Need at least 2 entities for relations
                 for h in range(num_valid_entities):
                     for t in range(num_valid_entities):
                         if h != t:
                             hts.append([h, t])
-            
+
             # Skip this sample if no valid entity pairs
             if not hts:
                 # Create dummy data to avoid empty batch issues
                 entity_pos = [[(0, 1)]]  # Dummy entity
                 hts = [[0, 0]]  # Dummy pair (will be filtered out later)
-            
+
             # Create dummy labels (not used during inference)
             labels = [[1] + [0] * (len(self.rel2id) - 1) for _ in hts]
-            
+
             feature = {
                 'input_ids': input_ids,
                 'entity_pos': entity_pos,
@@ -408,7 +504,7 @@ class DreeamInference:
                 'sent_labels': None,
                 'title': sample['title']
             }
-            
+
             features.append(feature)
         
         return features
@@ -461,33 +557,79 @@ class DreeamInference:
         dataloader = DataLoader(features, batch_size=self.batch_size, shuffle=False,
                                collate_fn=collate_fn, drop_last=False,
                                num_workers=4, pin_memory=True, prefetch_factor=2)
-        
+
         all_preds = []
         all_scores = []
         all_topks = []
-        
+        all_logits = []  # Collect logits for per-class thresholds
+
         with torch.no_grad():
             for batch in dataloader:
                 inputs = self._load_input(batch, tag="test")
-                
+
                 outputs = self.model(**inputs)
+
+                # Collect logits if we have per-class thresholds
+                if self.optimized_thresholds is not None and "logits" in outputs:
+                    all_logits.append(outputs["logits"].cpu())
+
                 pred = outputs["rel_pred"].cpu().numpy()
                 pred[np.isnan(pred)] = 0
                 all_preds.append(pred)
-                
+
                 if "scores" in outputs:
                     all_scores.append(outputs["scores"].cpu().numpy())
                     all_topks.append(outputs["topks"].cpu().numpy())
-        
+
         # Concatenate predictions
         preds = np.concatenate(all_preds, axis=0)
-        scores = np.concatenate(all_scores, axis=0) if all_scores else []
-        topks = np.concatenate(all_topks, axis=0) if all_topks else []
-        
+        scores = np.concatenate(all_scores, axis=0) if len(all_scores) > 0 else []
+        topks = np.concatenate(all_topks, axis=0) if len(all_topks) > 0 else []
+
+        # Apply per-class thresholds if available
+        if self.optimized_thresholds is not None and len(all_logits) > 0:
+            logits_concat = torch.cat(all_logits, dim=0)
+            preds_optimized = apply_per_class_thresholds(
+                logits_concat,
+                self.optimized_thresholds,
+                num_labels=self.num_labels
+            )
+            preds = preds_optimized.cpu().numpy()
+            print(f"✓ Applied optimized thresholds to {logits_concat.shape[0]} predictions")
+
+        # Check if features are chunked (have entity_map field)
+        if len(features) > 0 and 'entity_map' in features[0]:
+            print(f"\n=== Merging {len(features)} chunk predictions ===")
+
+            # Prepare scores for merging (convert to list of arrays per feature)
+            scores_list = []
+            if len(scores) > 0:
+                idx = 0
+                for feat in features:
+                    num_pairs = len(feat['hts'])
+                    scores_list.append(scores[idx:idx + num_pairs])
+                    idx += num_pairs
+
+            # Merge chunk predictions
+            merged_features, merged_preds, merged_scores = merge_chunk_predictions(
+                features=features,
+                preds=preds,
+                scores=scores_list if len(scores_list) > 0 else None,
+                id2rel=self.id2rel,
+                merge_strategy='union'
+            )
+
+            # Update features and predictions with merged results
+            features = merged_features
+            preds = merged_preds
+
+            if merged_scores is not None and len(merged_scores) > 0:
+                scores = np.concatenate(merged_scores, axis=0)
+
         # Convert to official format
-        official_results, results = to_official(self.id2rel, preds, features, 
+        official_results, results = to_official(self.id2rel, preds, features,
                                               scores=scores, topks=topks)
-        
+
         # Convert to simple tuple format
         return self._convert_to_simple_format(official_results, samples)
     

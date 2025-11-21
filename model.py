@@ -252,11 +252,11 @@ class DocREModel(nn.Module):
             output["scores"] = scores_topk[0]
             output["topks"] = scores_topk[1]
             output["logits"] = logits  # Include logits for per-class threshold optimization
-        
+
         if tag == "infer": # teacher model inference
             output["attns"] = doc_attn.split(batch_rel)
 
-        else: # training
+        if tag == "train" and labels is not None: # training (only compute loss during training)
             # relation extraction loss
             loss = self.loss_fnt(logits.float(), labels.float())
             output["loss"] = {"rel_loss": loss.to(sequence_output)}

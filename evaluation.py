@@ -511,10 +511,11 @@ def optimize_per_class_thresholds(
             outputs = model(**inputs)
 
             # Get relation logits (batch_size * num_pairs, num_classes)
-            logits = outputs.get('rel_pred', outputs.get('logits', None))
+            # Use raw logits, not thresholded predictions
+            logits = outputs.get('logits', None)
 
             if logits is None:
-                raise ValueError("Model output does not contain 'rel_pred' or 'logits'")
+                raise ValueError("Model output does not contain 'logits'. Ensure model is in dev/test mode.")
 
             all_logits.append(logits.cpu())
             all_labels.append(batch[2])  # labels are already on CPU

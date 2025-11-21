@@ -294,30 +294,18 @@ class EnhancedAMTLoss(nn.Module):
             output[:, 0] = (output.sum(1) == 0.).to(logits)
             return output
 
-        # Compute threshold for each segment
-        all_th_logits = []
-        for i in range(self.num_segments):
-            segment_relations = self.segments[i]
-            th_logit = logits[:, segment_relations].mean(dim=1, keepdim=True)
-            all_th_logits.append(th_logit)
-
-        # Apply weighted averaging
-        for i in range(self.num_segments):
-            if self.num_segments > 1:
-                other_th_sum = sum([th for j, th in enumerate(all_th_logits) if j != i])
-                all_th_logits[i] = (all_th_logits[i] + other_th_sum) / self.lambda_weight
+        # Use "no relation" (class 0) logit as base threshold for all segments
+        # This follows the same principle as ATLoss
+        base_th_logit = logits[:, 0].unsqueeze(1)
 
         # Create output tensor
         output = torch.zeros_like(logits).to(logits)
 
-        # For each segment, compare logits with segment threshold
-        for i in range(self.num_segments):
-            segment_relations = self.segments[i]
-            th_logit = all_th_logits[i]
-
-            for rel_idx in segment_relations:
-                mask = logits[:, rel_idx] > th_logit.squeeze()
-                output[:, rel_idx][mask] = 1.0
+        # For AMTL, we compare each relation with the "no relation" threshold
+        # The segments help organize the loss computation during training,
+        # but for inference we use a simpler comparison like ATLoss
+        mask = (logits > base_th_logit)
+        output[mask] = 1.0
 
         # Apply top-k constraint if specified
         if num_labels > 0:

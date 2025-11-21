@@ -153,7 +153,11 @@ def train(args, model, train_features, dev_features, id2rel):
         threshold_path = os.path.join(args.save_path, "optimized_thresholds.json")
         save_optimized_thresholds(optimized_thresholds, threshold_path)
         print(f"✓ Optimized thresholds saved to {threshold_path}")
-        print(f"  Average F1 improvement: {optimized_thresholds['average_improvement']:.2f}%")
+
+        # Calculate and print average F1
+        if optimized_thresholds:
+            avg_f1 = sum(info['f1'] for info in optimized_thresholds.values()) / len(optimized_thresholds)
+            print(f"  Average F1 across all classes: {avg_f1*100:.2f}%")
 
 def evaluate(args, model, features, id2rel, tag="dev", optimized_thresholds=None):
     dataloader = DataLoader(features, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False)

@@ -87,4 +87,12 @@ def add_args(parser):
     parser.add_argument("--threshold_step", type=float, default=0.05,
                         help="Step size for threshold grid search (default: 0.05).")
 
+    # Document chunking parameters
+    parser.add_argument("--use_chunking", action="store_true",
+                        help="Enable document chunking for long sequences.")
+    parser.add_argument("--chunk_size", type=int, default=512,
+                        help="Maximum tokens per chunk (default: 512).")
+    parser.add_argument("--chunk_overlap", type=int, default=128,
+                        help="Number of overlapping tokens between chunks (default: 128).")
+
     return parser

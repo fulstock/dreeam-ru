@@ -132,12 +132,16 @@ def get_pseudo_features(raw_feature: dict, pred_rels: list, entities: list, sent
     return pseudo_features, pos_samples, neg_samples
 
 def read_docred(dataset_dir,
-                file_in, 
-                tokenizer, 
+                file_in,
+                tokenizer,
                 transformer_type="bert",
-                max_seq_length=1024, 
+                max_seq_length=1024,
                 teacher_sig_path="",
-                single_results=None):
+                single_results=None,
+                use_chunking=False,
+                chunk_size=512,
+                chunk_overlap=128,
+                max_sent_num=25):
     i_line = 0
     pos_samples = 0
     neg_samples = 0
@@ -267,30 +271,77 @@ def read_docred(dataset_dir,
         # assert len(sents) < max_seq_length
         if max_len < len(sents):
             max_len = len(sents)
-        if len(sents) > max_seq_length:
-          print(f'Warning: len(sent): {len(sents)} > max_seq_length {max_seq_length}')
-        sents = sents[:max_seq_length - 2] # truncate, -2 for [CLS] and [SEP]
-        input_ids = tokenizer.convert_tokens_to_ids(sents)
-        input_ids = tokenizer.build_inputs_with_special_tokens(input_ids)
 
-        # if len(sent_labels) < 1:
-        #     print({'input_ids': input_ids,
-        #            'entity_pos': entity_pos,
-        #            'labels': relations,
-        #            'hts': hts,
-        #            'sent_pos': sent_pos,
-        #            'sent_labels': sent_labels,
-        #            'title': sample['title'],
-        #            })
+        # Try chunking if enabled and document is too long
+        if use_chunking and len(sents) > chunk_size:
+            print(f'Chunking document "{sample["title"][:50]}..." ({len(sents)} tokens) into chunks of {chunk_size} with overlap {chunk_overlap}')
 
-        feature = [{'input_ids': input_ids,
-                   'entity_pos': entity_pos,
-                   'labels': relations,
-                   'hts': hts,
-                   'sent_pos': sent_pos,
-                   'sent_labels': sent_labels,
-                   'title': sample['title'],
-                   }]
+            chunks = chunk_document(
+                sents=sents,
+                entity_pos=entity_pos,
+                train_triple=train_triple,
+                sent_pos=sent_pos,
+                sample=sample,
+                chunk_size=chunk_size,
+                chunk_overlap=chunk_overlap,
+                docred_rel2id=docred_rel2id,
+                max_sent_num=max_sent_num
+            )
+
+            if chunks is not None:
+                # Convert chunks to features
+                feature = []
+                for chunk in chunks:
+                    # Convert chunk tokens to input_ids
+                    chunk_input_ids = tokenizer.convert_tokens_to_ids(chunk['chunk_tokens'])
+                    chunk_input_ids = tokenizer.build_inputs_with_special_tokens(chunk_input_ids)
+
+                    chunk_feature = {
+                        'input_ids': chunk_input_ids,
+                        'entity_pos': chunk['entity_pos'],
+                        'labels': chunk['labels'],
+                        'hts': chunk['hts'],
+                        'sent_pos': chunk['sent_pos'],
+                        'sent_labels': chunk['sent_labels'],
+                        'title': sample['title'],
+                        'entity_map': chunk['entity_map'],
+                        'chunk_id': chunk['chunk_id'],
+                        'original_title': chunk['original_title'],
+                    }
+                    feature.append(chunk_feature)
+
+                print(f'  -> Created {len(feature)} chunks')
+            else:
+                # Chunking returned None (shouldn't happen, but fallback)
+                if len(sents) > max_seq_length:
+                    print(f'Warning: len(sent): {len(sents)} > max_seq_length {max_seq_length}')
+                sents = sents[:max_seq_length - 2]
+                input_ids = tokenizer.convert_tokens_to_ids(sents)
+                input_ids = tokenizer.build_inputs_with_special_tokens(input_ids)
+                feature = [{'input_ids': input_ids,
+                           'entity_pos': entity_pos,
+                           'labels': relations,
+                           'hts': hts,
+                           'sent_pos': sent_pos,
+                           'sent_labels': sent_labels,
+                           'title': sample['title'],
+                           }]
+        else:
+            # No chunking: use original logic (truncation)
+            if len(sents) > max_seq_length:
+                print(f'Warning: len(sent): {len(sents)} > max_seq_length {max_seq_length}')
+            sents = sents[:max_seq_length - 2]  # truncate, -2 for [CLS] and [SEP]
+            input_ids = tokenizer.convert_tokens_to_ids(sents)
+            input_ids = tokenizer.build_inputs_with_special_tokens(input_ids)
+
+            feature = [{'input_ids': input_ids,
+                       'entity_pos': entity_pos,
+                       'labels': relations,
+                       'hts': hts,
+                       'sent_pos': sent_pos,
+                       'sent_labels': sent_labels,
+                       'title': sample['title'],
+                       }]
 
         # print(len(sent_labels))
 
@@ -419,4 +470,180 @@ def compute_relation_frequencies(features, num_classes=48):
     print(f"  Least frequent (non-zero): {min(f for f in frequencies if f > 0)} samples")
 
     return frequencies
+
+
+def chunk_document(sents, entity_pos, train_triple, sent_pos, sample,
+                   chunk_size=512, chunk_overlap=128, docred_rel2id=None,
+                   max_sent_num=25):
+    """
+    Split a long document into overlapping token-based chunks.
+
+    This function handles:
+    1. Splitting document into overlapping token chunks
+    2. Mapping entity positions from document-space to chunk-local space
+    3. Filtering entity pairs (skipping cross-chunk pairs)
+    4. Remapping sentence positions and evidence labels
+
+    Args:
+        sents: List of wordpiece tokens (already tokenized with entity markers)
+        entity_pos: List of entity positions [(start, end), ...] for each entity
+        train_triple: Dict of (h, t) -> [{'relation': r, 'evidence': [sent_ids]}]
+        sent_pos: List of sentence positions [(start, end), ...] for each sentence
+        sample: Original sample dict with 'title' and 'vertexSet'
+        chunk_size: Maximum tokens per chunk (default: 512)
+        chunk_overlap: Number of tokens to overlap between chunks (default: 128)
+        docred_rel2id: Relation ID mapping
+        max_sent_num: Maximum sentences per chunk (for sent_labels padding)
+
+    Returns:
+        List of feature dicts, one per chunk. Each chunk has:
+        - chunk_tokens: Token list for this chunk
+        - entity_pos: Entity positions remapped to chunk-local coordinates
+        - hts: Entity pairs (h, t) for this chunk
+        - relations: Relation labels for entity pairs
+        - sent_pos: Sentence positions remapped to chunk-local coordinates
+        - sent_labels: Evidence labels remapped to chunk sentences
+        - entity_map: Mapping from chunk-local entity indices to original document indices
+        - chunk_id: Chunk number (for debugging)
+        - original_title: Document title (for later merging)
+    """
+    doc_len = len(sents)
+
+    # If document fits in one chunk, return as-is (no chunking needed)
+    if doc_len <= chunk_size:
+        return None  # Signal to use original processing
+
+    chunks = []
+    chunk_id = 0
+
+    # Calculate chunk boundaries using sliding window
+    chunk_starts = []
+    start = 0
+    while start < doc_len:
+        chunk_starts.append(start)
+        # Move window forward by (chunk_size - chunk_overlap)
+        start += (chunk_size - chunk_overlap)
+        # Ensure we don't create tiny final chunk
+        if start < doc_len and doc_len - start < chunk_overlap:
+            break
+
+    # Always include final chunk starting from end
+    if chunk_starts[-1] < doc_len - chunk_size:
+        chunk_starts.append(max(0, doc_len - chunk_size))
+
+    for chunk_start in chunk_starts:
+        chunk_end = min(chunk_start + chunk_size, doc_len)
+
+        # Extract chunk tokens
+        chunk_tokens = sents[chunk_start:chunk_end]
+
+        # Map entities to this chunk
+        chunk_entity_pos = []
+        chunk_entity_map = {}  # chunk_local_id -> original_entity_id
+
+        for orig_ent_id, entity_mentions in enumerate(entity_pos):
+            chunk_mentions = []
+
+            for mention_start, mention_end in entity_mentions:
+                # Check if mention is within chunk boundaries
+                if mention_start >= chunk_start and mention_end <= chunk_end:
+                    # Remap to chunk-local coordinates
+                    local_start = mention_start - chunk_start
+                    local_end = mention_end - chunk_start
+                    chunk_mentions.append((local_start, local_end))
+
+            # Only add entity if it has at least one mention in this chunk
+            if chunk_mentions:
+                chunk_local_id = len(chunk_entity_pos)
+                chunk_entity_pos.append(chunk_mentions)
+                chunk_entity_map[chunk_local_id] = orig_ent_id
+
+        # Create reverse mapping for quick lookup
+        orig_to_chunk = {v: k for k, v in chunk_entity_map.items()}
+
+        # Map sentence positions to this chunk
+        chunk_sent_pos = []
+        chunk_sent_map = {}  # chunk_local_sent_id -> original_sent_id
+
+        for orig_sent_id, (sent_start, sent_end) in enumerate(sent_pos):
+            # Check if sentence overlaps with chunk
+            if sent_end > chunk_start and sent_start < chunk_end:
+                # Calculate intersection
+                local_start = max(0, sent_start - chunk_start)
+                local_end = min(chunk_end - chunk_start, sent_end - chunk_start)
+
+                if local_end > local_start:  # Valid sentence
+                    chunk_local_sent_id = len(chunk_sent_pos)
+                    chunk_sent_pos.append((local_start, local_end))
+                    chunk_sent_map[chunk_local_sent_id] = orig_sent_id
+
+        # Create entity pairs and labels
+        chunk_relations = []
+        chunk_hts = []
+        chunk_sent_labels = []
+
+        # First add positive pairs from train_triple
+        for (h, t), mentions in train_triple.items():
+            # Check if both entities are in this chunk
+            if h in orig_to_chunk and t in orig_to_chunk:
+                chunk_h = orig_to_chunk[h]
+                chunk_t = orig_to_chunk[t]
+
+                # Create relation label vector
+                relation = [0] * len(docred_rel2id)
+                sent_evi = [0] * len(chunk_sent_pos)
+
+                for mention in mentions:
+                    relation[mention["relation"]] = 1
+
+                    # Remap evidence sentence IDs to chunk-local
+                    for orig_sent_id in mention["evidence"]:
+                        # Find if this sentence is in current chunk
+                        for chunk_sent_id, mapped_orig_sent_id in chunk_sent_map.items():
+                            if mapped_orig_sent_id == orig_sent_id:
+                                sent_evi[chunk_sent_id] += 1
+                                break
+
+                chunk_relations.append(relation)
+                chunk_hts.append([chunk_h, chunk_t])
+                chunk_sent_labels.append(sent_evi)
+
+        # Add negative pairs (entity pairs without relations)
+        num_chunk_entities = len(chunk_entity_pos)
+        for h in range(num_chunk_entities):
+            for t in range(num_chunk_entities):
+                if h != t and [h, t] not in chunk_hts:
+                    # Get original entity IDs
+                    orig_h = chunk_entity_map[h]
+                    orig_t = chunk_entity_map[t]
+
+                    # Skip if this pair exists in train_triple (cross-chunk relation)
+                    if (orig_h, orig_t) in train_triple:
+                        continue
+
+                    # Create negative label
+                    relation = [1] + [0] * (len(docred_rel2id) - 1)  # "Na" relation
+                    sent_evi = [0] * len(chunk_sent_pos)
+
+                    chunk_relations.append(relation)
+                    chunk_hts.append([h, t])
+                    chunk_sent_labels.append(sent_evi)
+
+        # Create chunk feature dict
+        chunk_feature = {
+            'chunk_tokens': chunk_tokens,
+            'entity_pos': chunk_entity_pos,
+            'labels': chunk_relations,
+            'hts': chunk_hts,
+            'sent_pos': chunk_sent_pos,
+            'sent_labels': chunk_sent_labels,
+            'entity_map': chunk_entity_map,
+            'chunk_id': chunk_id,
+            'original_title': sample['title'],
+        }
+
+        chunks.append(chunk_feature)
+        chunk_id += 1
+
+    return chunks
 

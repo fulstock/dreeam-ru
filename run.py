@@ -211,6 +211,34 @@ def evaluate(args, model, features, id2rel, tag="dev", optimized_thresholds=None
         topks =  np.concatenate(topks, axis=0)
     if len(evi_preds) > 0:
         evi_preds = np.concatenate(evi_preds, axis=0)
+
+    # Check if features are chunked (have entity_map field)
+    if len(features) > 0 and 'entity_map' in features[0]:
+        print(f"\n=== Merging {len(features)} chunk predictions ===")
+        from evaluation import merge_chunk_predictions
+
+        # Prepare scores for merging (convert to list of arrays per feature)
+        scores_list = []
+        if len(scores) > 0:
+            # Assume scores are parallel to predictions
+            for i in range(len(preds)):
+                scores_list.append(scores[i] if i < len(scores) else None)
+        else:
+            scores_list = None
+
+        # Merge chunks back to original documents
+        merged_features, merged_preds, merged_scores = merge_chunk_predictions(
+            features, preds, scores_list
+        )
+
+        print(f"✓ Merged to {len(merged_features)} original documents")
+
+        # Replace with merged versions
+        features = merged_features
+        preds = np.concatenate(merged_preds, axis=0) if len(merged_preds) > 0 else preds
+        if merged_scores is not None and len(merged_scores) > 0:
+            scores = np.concatenate(merged_scores, axis=0)
+
     official_results, results = to_official(id2rel, preds, features, evi_preds = evi_preds, scores = scores, topks = topks)
 
     detailed_metrics = None  # Initialize variable for detailed metrics
@@ -438,8 +466,8 @@ def main():
         train_file = os.path.join(args.data_dir, args.train_file)
         dev_file = os.path.join(args.data_dir, args.dev_file)
 
-        train_features = read(args.data_dir, train_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length, teacher_sig_path=args.teacher_sig_path)
-        dev_features = read(args.data_dir, dev_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length)
+        train_features = read(args.data_dir, train_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length, teacher_sig_path=args.teacher_sig_path, use_chunking=args.use_chunking, chunk_size=args.chunk_size, chunk_overlap=args.chunk_overlap, max_sent_num=args.max_sent_num)
+        dev_features = read(args.data_dir, dev_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length, use_chunking=args.use_chunking, chunk_size=args.chunk_size, chunk_overlap=args.chunk_overlap, max_sent_num=args.max_sent_num)
 
         # Apply negative sampling if enabled
         if args.use_negative_sampling:
@@ -464,7 +492,7 @@ def main():
         basename = os.path.splitext(args.test_file)[0]
         test_file = os.path.join(args.data_dir, args.test_file)
 
-        test_features = read(args.data_dir, test_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length)
+        test_features = read(args.data_dir, test_file, tokenizer, transformer_type=args.transformer_type, max_seq_length=args.max_seq_length, use_chunking=args.use_chunking, chunk_size=args.chunk_size, chunk_overlap=args.chunk_overlap, max_sent_num=args.max_sent_num)
 
         # Load optimized thresholds if they exist and per-class thresholds are enabled
         optimized_thresholds = None

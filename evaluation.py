@@ -710,3 +710,133 @@ def apply_per_class_thresholds(logits, thresholds, num_labels=-1):
     output[:, 0] = (output[:, 1:].sum(1) == 0.).float()
 
     return output
+
+
+def merge_chunk_predictions(chunk_features, chunk_predictions, chunk_scores=None):
+    """
+    Merge predictions from multiple document chunks back into original documents.
+
+    This function implements the union merge strategy:
+    - Groups chunks by original document (using 'original_title' or 'title')
+    - Maps chunk-local entity indices back to original document entity indices
+    - For each (head, tail) entity pair:
+      - Takes maximum score across all chunks for each relation
+      - Combines predictions from all chunks (union strategy)
+
+    Args:
+        chunk_features: List of feature dicts from chunked documents
+                       Each must have 'entity_map', 'hts', 'title'/'original_title'
+        chunk_predictions: List of prediction arrays (batch_size, num_relations)
+                          Parallel to chunk_features
+        chunk_scores: Optional list of score arrays for each chunk
+                     Used to select best prediction when merging
+
+    Returns:
+        merged_features: List of feature dicts, one per original document
+        merged_predictions: List of prediction arrays for original documents
+        merged_scores: List of score arrays (if chunk_scores was provided)
+    """
+    import numpy as np
+    from collections import defaultdict
+
+    # Group chunks by original document
+    doc_to_chunks = defaultdict(list)
+
+    for chunk_idx, feature in enumerate(chunk_features):
+        # Use 'original_title' if available (from chunking), else 'title'
+        doc_title = feature.get('original_title', feature.get('title'))
+
+        doc_to_chunks[doc_title].append({
+            'chunk_idx': chunk_idx,
+            'feature': feature,
+            'predictions': chunk_predictions[chunk_idx],
+            'scores': chunk_scores[chunk_idx] if chunk_scores is not None else None,
+        })
+
+    # Merge each document
+    merged_features = []
+    merged_predictions = []
+    merged_scores = [] if chunk_scores is not None else None
+
+    for doc_title, chunks in doc_to_chunks.items():
+        # If only one chunk, no merging needed
+        if len(chunks) == 1:
+            merged_features.append(chunks[0]['feature'])
+            merged_predictions.append(chunks[0]['predictions'])
+            if chunk_scores is not None:
+                merged_scores.append(chunks[0]['scores'])
+            continue
+
+        # Multiple chunks: need to merge
+        # Build mapping from original entity pairs to chunk predictions
+        num_relations = chunks[0]['predictions'].shape[1]
+
+        # Dictionary: (orig_h, orig_t) -> list of (prediction, score) tuples
+        pair_to_preds = defaultdict(list)
+
+        for chunk in chunks:
+            feature = chunk['feature']
+            entity_map = feature.get('entity_map', {})  # chunk_local -> original
+            hts = feature['hts']
+            preds = chunk['predictions']
+            scores = chunk['scores']
+
+            # Map each chunk-local entity pair to original entity pair
+            for local_idx, (chunk_h, chunk_t) in enumerate(hts):
+                # Get original entity indices
+                orig_h = entity_map.get(chunk_h, chunk_h)
+                orig_t = entity_map.get(chunk_t, chunk_t)
+
+                # Store prediction and score for this pair
+                pair_to_preds[(orig_h, orig_t)].append({
+                    'prediction': preds[local_idx],
+                    'score': scores[local_idx] if scores is not None else None,
+                })
+
+        # Merge predictions for each entity pair using union strategy
+        merged_hts = []
+        merged_preds_list = []
+        merged_scores_list = []
+
+        for (orig_h, orig_t), pred_list in pair_to_preds.items():
+            merged_hts.append([orig_h, orig_t])
+
+            # Union strategy: take maximum across chunks for each relation
+            if len(pred_list) == 1:
+                # Only one chunk has this pair
+                merged_pred = pred_list[0]['prediction']
+                merged_score = pred_list[0]['score']
+            else:
+                # Multiple chunks have this pair: take max
+                stacked_preds = np.stack([p['prediction'] for p in pred_list], axis=0)
+                merged_pred = stacked_preds.max(axis=0)
+
+                if scores is not None:
+                    stacked_scores = np.stack([p['score'] for p in pred_list], axis=0)
+                    merged_score = stacked_scores.max(axis=0)
+                else:
+                    merged_score = None
+
+            merged_preds_list.append(merged_pred)
+            if scores is not None:
+                merged_scores_list.append(merged_score)
+
+        # Convert to numpy arrays
+        merged_preds_array = np.array(merged_preds_list)
+
+        if chunk_scores is not None:
+            merged_scores_array = np.array(merged_scores_list)
+            merged_scores.append(merged_scores_array)
+
+        # Create merged feature dict (use first chunk as template)
+        merged_feature = {
+            'title': doc_title,
+            'hts': merged_hts,
+            # Note: We don't reconstruct full entity_pos, input_ids, etc.
+            # These are only needed for training, not for evaluation
+        }
+
+        merged_features.append(merged_feature)
+        merged_predictions.append(merged_preds_array)
+
+    return merged_features, merged_predictions, merged_scores

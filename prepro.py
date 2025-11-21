@@ -320,3 +320,103 @@ def read_docred(dataset_dir,
 
     return features
 
+
+def negative_sampling(features, neg_pos_ratio=3.0, seed=42):
+    """
+    Balance training data by sampling negative examples to achieve target neg:pos ratio.
+
+    Implements negative sampling from Ayaou (2025):
+    "Tackling Class Imbalance in Relation Extraction for french text"
+
+    Args:
+        features: List of training examples (each is a dict with 'labels', etc.)
+        neg_pos_ratio: Desired negative-to-positive ratio (default: 3.0 for 3:1)
+        seed: Random seed for reproducibility
+
+    Returns:
+        List of features with balanced neg:pos ratio
+    """
+    import random
+    random.seed(seed)
+
+    positive_features = []
+    negative_features = []
+
+    print(f"\nApplying negative sampling (target ratio {neg_pos_ratio}:1)...")
+
+    # Count positive and negative examples at the document level
+    # A document is "positive" if it contains at least one positive relation
+    for feature in features:
+        has_positive_relation = False
+
+        for label in feature['labels']:
+            # label[0] is "no relation" (Na), label[1:] are actual relations
+            if sum(label[1:]) > 0:  # Has at least one positive relation
+                has_positive_relation = True
+                break
+
+        if has_positive_relation:
+            positive_features.append(feature)
+        else:
+            negative_features.append(feature)
+
+    print(f"  Original: {len(positive_features)} positive, {len(negative_features)} negative documents")
+    print(f"  Original ratio: {len(negative_features) / (len(positive_features) + 1e-8):.2f}:1")
+
+    # Calculate target number of negative examples
+    target_negatives = int(len(positive_features) * neg_pos_ratio)
+
+    # Sample negatives
+    if len(negative_features) > target_negatives:
+        sampled_negatives = random.sample(negative_features, target_negatives)
+        print(f"  Sampled {target_negatives} negative documents from {len(negative_features)}")
+    else:
+        sampled_negatives = negative_features
+        print(f"  Using all {len(negative_features)} negative documents (less than target {target_negatives})")
+
+    # Combine positive and sampled negative examples
+    balanced_features = positive_features + sampled_negatives
+
+    # Shuffle to mix positive and negative examples
+    random.shuffle(balanced_features)
+
+    print(f"  Final: {len(positive_features)} positive, {len(sampled_negatives)} negative documents")
+    print(f"  Final ratio: {len(sampled_negatives) / (len(positive_features) + 1e-8):.2f}:1")
+    print(f"  Total documents: {len(balanced_features)}\n")
+
+    return balanced_features
+
+
+def compute_relation_frequencies(features, num_classes=48):
+    """
+    Compute the frequency of each relation class in the dataset.
+
+    Args:
+        features: List of training examples
+        num_classes: Total number of relation classes
+
+    Returns:
+        List of frequencies for each class (index = class id, value = count)
+    """
+    from collections import Counter
+
+    relation_counts = Counter()
+
+    for feature in features:
+        for label in feature['labels']:
+            # label is a one-hot or multi-hot vector
+            for rel_id, is_present in enumerate(label):
+                if is_present > 0:
+                    relation_counts[rel_id] += 1
+
+    # Convert to list format
+    frequencies = [relation_counts.get(i, 0) for i in range(num_classes)]
+
+    print("\nRelation frequency statistics:")
+    print(f"  Total relations: {sum(frequencies)}")
+    print(f"  Unique relation types with samples: {sum(1 for f in frequencies if f > 0)}/{num_classes}")
+    print(f"  Most frequent: class {np.argmax(frequencies)} with {max(frequencies)} samples")
+    print(f"  Least frequent (non-zero): {min(f for f in frequencies if f > 0)} samples")
+
+    return frequencies
+

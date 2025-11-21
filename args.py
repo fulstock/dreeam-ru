@@ -63,4 +63,28 @@ def add_args(parser):
     parser.add_argument("--num_class", type=int, default=97,
                         help="Number of relation types in dataset.")
 
+    # Class imbalance handling parameters
+    parser.add_argument("--use_amtl", action="store_true",
+                        help="Use Enhanced AMTL loss instead of standard ATLoss.")
+    parser.add_argument("--num_segments", type=int, default=4,
+                        help="Number of label space segments for AMTL (default: 4).")
+    parser.add_argument("--lambda_weight", type=float, default=3.5,
+                        help="Coefficient for weighted threshold averaging in AMTL (default: 3.5).")
+    parser.add_argument("--use_effective_number", action="store_true",
+                        help="Use effective number weighting in AMTL.")
+    parser.add_argument("--beta", type=float, default=0.9999,
+                        help="Beta parameter for effective number calculation (default: 0.9999).")
+    parser.add_argument("--use_negative_sampling", action="store_true",
+                        help="Apply negative sampling to balance training data.")
+    parser.add_argument("--neg_pos_ratio", type=float, default=3.0,
+                        help="Negative-to-positive ratio for negative sampling (default: 3.0).")
+    parser.add_argument("--use_per_class_thresholds", action="store_true",
+                        help="Optimize and use per-class thresholds for inference.")
+    parser.add_argument("--threshold_range_min", type=float, default=0.1,
+                        help="Minimum threshold for per-class optimization (default: 0.1).")
+    parser.add_argument("--threshold_range_max", type=float, default=0.95,
+                        help="Maximum threshold for per-class optimization (default: 0.95).")
+    parser.add_argument("--threshold_step", type=float, default=0.05,
+                        help="Step size for threshold grid search (default: 0.05).")
+
     return parser

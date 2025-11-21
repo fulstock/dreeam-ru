@@ -8,5 +8,18 @@
 	"evi_thresh": 0.2,
 	"max_seq_length": 1460,
 	"max_sent_num": 101,
-	"batch_size": 4
+	"batch_size": 4,
+
+	"# Class Imbalance Handling": "Parameters for AMTL loss and sampling techniques",
+	"use_amtl": false,
+	"num_segments": 4,
+	"lambda_weight": 3.5,
+	"use_effective_number": true,
+	"beta": 0.9999,
+	"use_negative_sampling": false,
+	"neg_pos_ratio": 3.0,
+	"use_per_class_thresholds": false,
+	"threshold_range_min": 0.1,
+	"threshold_range_max": 0.95,
+	"threshold_step": 0.05
 }

@@ -68,6 +68,13 @@ def add_args(parser):
                         help="Number of length buckets for smart batching (default: 10).")
 
     # Class imbalance handling parameters
+    parser.add_argument("--use_focal_loss", action="store_true",
+                        help="Use Focal Loss instead of standard ATLoss (recommended for imbalanced data).")
+    parser.add_argument("--focal_gamma", type=float, default=2.0,
+                        help="Focusing parameter for Focal Loss (default: 2.0). Higher = more focus on hard examples.")
+    parser.add_argument("--focal_alpha", type=float, default=0.25,
+                        help="Weighting factor for positive class in Focal Loss (default: 0.25).")
+
     parser.add_argument("--use_amtl", action="store_true",
                         help="Use Enhanced AMTL loss instead of standard ATLoss.")
     parser.add_argument("--num_segments", type=int, default=4,

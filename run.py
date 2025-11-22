@@ -52,7 +52,10 @@ def train(args, model, train_features, dev_features, id2rel):
         def log_print(msg):
             """Print to both console and log file"""
             print(msg)
-            log_f.write(msg + "\n")
+            # Convert to string if dict or other non-string type
+            if isinstance(msg, dict):
+                msg = str(msg)
+            log_f.write(str(msg) + "\n")
             log_f.flush()
 
         # Use smart batching if enabled (20-30% less padding)

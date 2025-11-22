@@ -5,6 +5,7 @@ import numpy as np
 from typing import List, Dict, Tuple, Optional
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 from torch.utils.data import DataLoader
+from huggingface_hub import hf_hub_download
 
 from model import DocREModel
 from utils import collate_fn
@@ -66,6 +67,7 @@ class DreeamInference:
         if not os.path.isabs(rel2id_path):
             rel2id_path = os.path.join(os.path.dirname(config_path), rel2id_path)
         
+        # Try to find rel2id file locally
         if not os.path.exists(rel2id_path):
             # Try alternative locations
             alt_paths = [
@@ -77,13 +79,21 @@ class DreeamInference:
                 if os.path.exists(alt_path):
                     rel2id_path = alt_path
                     break
-        
+
+        # Load rel2id from local file or download from HuggingFace
         if os.path.exists(rel2id_path):
             with open(rel2id_path, 'r', encoding='utf-8') as f:
                 self.rel2id = json.load(f)
                 self.id2rel = {v: k for k, v in self.rel2id.items()}
         else:
-            raise FileNotFoundError(f"Relation mapping file not found: {rel2id_path}")
+            # Try downloading from HuggingFace
+            rel2id_path = self._download_rel2id(self.model_path)
+            if rel2id_path and os.path.exists(rel2id_path):
+                with open(rel2id_path, 'r', encoding='utf-8') as f:
+                    self.rel2id = json.load(f)
+                    self.id2rel = {v: k for k, v in self.rel2id.items()}
+            else:
+                raise FileNotFoundError(f"Relation mapping file not found: {rel2id_path}")
         
         # Initialize model
         self._load_model()
@@ -135,27 +145,25 @@ class DreeamInference:
             )
         
         # Load trained weights
-        checkpoint_path = self.model_path
-        if not os.path.exists(checkpoint_path):
-            checkpoint_path = os.path.join(self.model_path, "last.ckpt")
-        
-        if os.path.exists(checkpoint_path):
+        checkpoint_path = self._get_checkpoint_path(self.model_path)
+
+        if checkpoint_path:
             # Load state dict and handle missing keys gracefully
             state_dict = torch.load(checkpoint_path, map_location=self.device)
-            
+
             # Handle version compatibility issues
             missing_keys, unexpected_keys = self.model.load_state_dict(state_dict, strict=False)
-            
+
             if missing_keys:
                 print(f"Warning: Missing keys in state_dict: {missing_keys}")
                 # Handle specific missing keys that are common in version mismatches
                 if any("position_ids" in key for key in missing_keys):
                     print("Note: position_ids missing - this is normal for newer transformers versions")
-            
+
             if unexpected_keys:
                 print(f"Warning: Unexpected keys in state_dict: {unexpected_keys}")
-            
-            print(f"Loaded model from: {checkpoint_path}")
+
+            print(f"✓ Loaded model from: {checkpoint_path}")
         else:
             raise FileNotFoundError(f"Model checkpoint not found in: {self.model_path}")
         
@@ -170,6 +178,80 @@ class DreeamInference:
 
         # Load per-class thresholds if available
         self._load_optimized_thresholds()
+
+    def _download_rel2id(self, repo_id: str) -> Optional[str]:
+        """
+        Download rel2id.json from HuggingFace Hub.
+
+        Args:
+            repo_id: HuggingFace repository ID
+
+        Returns:
+            Path to downloaded file, or None if failed
+        """
+        try:
+            print(f"Attempting to download rel2id.json from HuggingFace: {repo_id}")
+            downloaded_path = hf_hub_download(
+                repo_id=repo_id,
+                filename="rel2id.json",
+                cache_dir=os.path.expanduser("~/.cache/huggingface/dreeam")
+            )
+            print(f"✓ Successfully downloaded rel2id.json from HuggingFace Hub")
+            return downloaded_path
+        except Exception as e:
+            print(f"Warning: Could not download rel2id.json from HuggingFace: {e}")
+            return None
+
+    def _get_checkpoint_path(self, model_path: str) -> Optional[str]:
+        """
+        Get checkpoint path from local filesystem or download from HuggingFace Hub.
+
+        Args:
+            model_path: Path to model checkpoint (local or HuggingFace repo ID)
+
+        Returns:
+            Path to checkpoint file, or None if not found
+        """
+        # Try local path first
+        if os.path.exists(model_path):
+            # If it's a file, use it directly
+            if os.path.isfile(model_path):
+                return model_path
+            # If it's a directory, look for common checkpoint names
+            else:
+                for ckpt_name in ["best.ckpt", "last.ckpt", "pytorch_model.bin"]:
+                    ckpt_path = os.path.join(model_path, ckpt_name)
+                    if os.path.exists(ckpt_path):
+                        return ckpt_path
+
+        # Not found locally, try to download from HuggingFace Hub
+        print(f"Local checkpoint not found, attempting to download from HuggingFace: {model_path}")
+
+        try:
+            # Try downloading common checkpoint filenames
+            for filename in ["best.ckpt", "pytorch_model.bin", "model.safetensors"]:
+                try:
+                    print(f"  Attempting to download: {filename}...")
+                    downloaded_path = hf_hub_download(
+                        repo_id=model_path,
+                        filename=filename,
+                        cache_dir=os.path.expanduser("~/.cache/huggingface/dreeam")
+                    )
+                    print(f"✓ Successfully downloaded {filename} from HuggingFace Hub")
+                    return downloaded_path
+                except Exception as e:
+                    # Try next filename
+                    continue
+
+            # If none of the common names worked, raise error
+            raise FileNotFoundError(
+                f"Could not find checkpoint in HuggingFace repo '{model_path}'. "
+                f"Tried: best.ckpt, pytorch_model.bin, model.safetensors"
+            )
+
+        except Exception as e:
+            print(f"Error downloading from HuggingFace: {e}")
+            return None
 
     def _load_optimized_thresholds(self):
         """Load per-class optimized thresholds if available."""

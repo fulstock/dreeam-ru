@@ -148,8 +148,46 @@ class DreeamInference:
         checkpoint_path = self._get_checkpoint_path(self.model_path)
 
         if checkpoint_path:
-            # Load state dict and handle missing keys gracefully
-            state_dict = torch.load(checkpoint_path, map_location=self.device)
+            # Load state dict and inspect architecture
+            state_dict = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
+
+            # Detect checkpoint architecture from state_dict
+            checkpoint_vocab_size = None
+            checkpoint_emb_size = None
+
+            if 'model.embeddings.word_embeddings.weight' in state_dict:
+                checkpoint_vocab_size = state_dict['model.embeddings.word_embeddings.weight'].shape[0]
+
+            if 'head_extractor.weight' in state_dict:
+                checkpoint_emb_size = state_dict['head_extractor.weight'].shape[0]
+
+            # Adjust tokenizer if vocab size mismatch
+            if checkpoint_vocab_size and checkpoint_vocab_size != len(self.tokenizer):
+                print(f"Note: Checkpoint vocab size ({checkpoint_vocab_size}) differs from current ({len(self.tokenizer)})")
+                print(f"  Adjusting tokenizer to match checkpoint...")
+
+                # Resize tokenizer and model to match checkpoint
+                while len(self.tokenizer) < checkpoint_vocab_size:
+                    self.tokenizer.add_special_tokens({'additional_special_tokens': [f'<unused{len(self.tokenizer)}>']})
+
+                transformer_model.resize_token_embeddings(len(self.tokenizer))
+                print(f"  ✓ Tokenizer adjusted to {len(self.tokenizer)} tokens")
+
+            # Recreate model if emb_size mismatch
+            if checkpoint_emb_size and checkpoint_emb_size != config.hidden_size:
+                print(f"Note: Checkpoint emb_size ({checkpoint_emb_size}) differs from config hidden_size ({config.hidden_size})")
+                print(f"  Recreating model with emb_size={checkpoint_emb_size}...")
+
+                self.model = DocREModel(
+                    config,
+                    transformer_model,
+                    self.tokenizer,
+                    emb_size=checkpoint_emb_size,  # Use checkpoint's emb_size
+                    num_labels=self.num_labels,
+                    max_sent_num=self.max_sent_num,
+                    evi_thresh=self.evi_thresh
+                )
+                print(f"  ✓ Model recreated with emb_size={checkpoint_emb_size}")
 
             # Handle version compatibility issues
             missing_keys, unexpected_keys = self.model.load_state_dict(state_dict, strict=False)

@@ -312,8 +312,14 @@ class DreeamInference:
                     })
         
         # Create vertex set from entity groups
-        vertex_set = list(entity_groups.values())
-        
+        # Filter out empty entity groups (entities that couldn't be mapped to tokens)
+        vertex_set = [group for group in entity_groups.values() if len(group) > 0]
+
+        # Debug: warn if entities were skipped
+        num_skipped = len(entity_groups) - len(vertex_set)
+        if num_skipped > 0:
+            print(f"Warning: Skipped {num_skipped} entities that couldn't be mapped to tokens in '{title}'")
+
         return {
             'title': title,
             'sents': tokenized_sents,
@@ -667,10 +673,11 @@ class DreeamInference:
                     relation = result['r']
                     
                     # Get entity texts
-                    if h_idx < len(sample['vertexSet']) and t_idx < len(sample['vertexSet']):
+                    if (h_idx < len(sample['vertexSet']) and t_idx < len(sample['vertexSet']) and
+                        len(sample['vertexSet'][h_idx]) > 0 and len(sample['vertexSet'][t_idx]) > 0):
                         head_entity = sample['vertexSet'][h_idx][0]['name']  # First mention
                         tail_entity = sample['vertexSet'][t_idx][0]['name']  # First mention
-                        
+
                         # Skip "Na" (no relation) predictions
                         if relation != "Na":
                             doc_relations.append((head_entity, tail_entity, relation))

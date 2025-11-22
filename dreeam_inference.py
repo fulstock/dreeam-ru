@@ -219,7 +219,7 @@ class DreeamInference:
                 return model_path
             # If it's a directory, look for common checkpoint names
             else:
-                for ckpt_name in ["best.ckpt", "last.ckpt", "pytorch_model.bin"]:
+                for ckpt_name in ["best.ckpt", "last.ckpt", "model.ckpt", "pytorch_model.bin"]:
                     ckpt_path = os.path.join(model_path, ckpt_name)
                     if os.path.exists(ckpt_path):
                         return ckpt_path
@@ -229,7 +229,7 @@ class DreeamInference:
 
         try:
             # Try downloading common checkpoint filenames
-            for filename in ["best.ckpt", "pytorch_model.bin", "model.safetensors"]:
+            for filename in ["model.ckpt", "best.ckpt", "last.ckpt", "pytorch_model.bin", "model.safetensors"]:
                 try:
                     print(f"  Attempting to download: {filename}...")
                     downloaded_path = hf_hub_download(
@@ -246,7 +246,7 @@ class DreeamInference:
             # If none of the common names worked, raise error
             raise FileNotFoundError(
                 f"Could not find checkpoint in HuggingFace repo '{model_path}'. "
-                f"Tried: best.ckpt, pytorch_model.bin, model.safetensors"
+                f"Tried: model.ckpt, best.ckpt, last.ckpt, pytorch_model.bin, model.safetensors"
             )
 
         except Exception as e:

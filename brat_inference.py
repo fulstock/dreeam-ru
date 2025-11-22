@@ -36,13 +36,13 @@ class BRATParser:
         """
         # Read text file with proper encoding
         try:
-            with open(txt_path, 'r', encoding='utf-8') as f:
+            with open(txt_path, 'r', encoding='utf-8', newline='') as f:
                 self.text = f.read()
         except UnicodeDecodeError:
             # Try different encodings
             for encoding in ['cp1251', 'latin-1', 'utf-8-sig']:
                 try:
-                    with open(txt_path, 'r', encoding=encoding) as f:
+                    with open(txt_path, 'r', encoding=encoding, newline='') as f:
                         self.text = f.read()
                     break
                 except UnicodeDecodeError:
@@ -53,7 +53,7 @@ class BRATParser:
         self.entityspan2id = {}
         self.relations = []
         
-        with open(ann_path, 'r', encoding='utf-8') as f:
+        with open(ann_path, 'r', encoding='utf-8', newline='') as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -205,11 +205,11 @@ def process_files(test_dir: str,
         
         total_pred_relations += len(pred_relations)
 
-        with open(os.path.join(output_dir, txt_file), "w", encoding = "UTF-8") as tf:
+        with open(os.path.join(output_dir, txt_file), "w", encoding = "UTF-8", newline='') as tf:
             print("Writing text of file", txt_file, "into", os.path.join(output_dir, txt_file))
             tf.write(text)
 
-        with open(os.path.join(output_dir, txt_file.replace('.txt','.ann')), "w", encoding = "UTF-8") as af:
+        with open(os.path.join(output_dir, txt_file.replace('.txt','.ann')), "w", encoding = "UTF-8", newline='') as af:
             print("Writing ner golds and rel perds of file", txt_file.replace('.txt','.ann'), "into", os.path.join(output_dir, txt_file.replace('.txt','.ann')))
             for p_idx, p in enumerate(sorted(list(entities), key = lambda e : (e["start"], e["type"], e["end"]))):
                 af.write("T" + str(p_idx + 1) + "\t" + p["type"] + " " + str(p["start"]) + " " + str(p["end"]) + "\t" + p["text"] + "\n")

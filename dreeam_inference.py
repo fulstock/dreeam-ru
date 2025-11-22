@@ -826,25 +826,259 @@ class DreeamInference:
 
 
 # Example usage
-if __name__ == "__main__":
-    # Example usage of the DreeamInference class
-    
-    # Initialize the inference model
-    inference = DreeamInference(
-        config_path="./nerel-config.json",
-        device="auto"
+def parse_brat_file(txt_path: str, ann_path: str) -> Tuple[str, List[Dict], str]:
+    """
+    Parse BRAT format files (.txt and .ann).
+
+    Args:
+        txt_path: Path to text file
+        ann_path: Path to annotation file
+
+    Returns:
+        Tuple of (text, entities, file_id)
+    """
+    # Read text file
+    try:
+        with open(txt_path, 'r', encoding='utf-8', newline='') as f:
+            text = f.read()
+    except UnicodeDecodeError:
+        # Try different encodings
+        for encoding in ['cp1251', 'latin-1', 'utf-8-sig']:
+            try:
+                with open(txt_path, 'r', encoding=encoding, newline='') as f:
+                    text = f.read()
+                break
+            except UnicodeDecodeError:
+                continue
+
+    # Parse entities from .ann file
+    entities = []
+    if os.path.exists(ann_path):
+        with open(ann_path, 'r', encoding='utf-8', newline='') as f:
+            for line in f:
+                line = line.strip()
+                if not line or not line.startswith('T'):
+                    continue
+
+                parts = line.split('\t')
+                if len(parts) < 3:
+                    continue
+
+                entity_info = parts[1].split()
+                entity_text = parts[2]
+
+                if len(entity_info) >= 3:
+                    entity_type = entity_info[0]
+                    start_pos = int(entity_info[1])
+                    end_pos = int(entity_info[2])
+
+                    entities.append({
+                        'text': entity_text,
+                        'start': start_pos,
+                        'end': end_pos,
+                        'type': entity_type
+                    })
+
+    file_id = os.path.splitext(os.path.basename(txt_path))[0]
+    return text, entities, file_id
+
+
+def format_relations_readable(relations: List[Tuple], sort_by_entity: bool = True) -> str:
+    """
+    Format relations in readable format: [head] -- relation -> [tail]
+
+    Args:
+        relations: List of (head, tail, relation) tuples
+        sort_by_entity: If True, sort by entities first, then by relation
+
+    Returns:
+        Formatted string
+    """
+    if not relations:
+        return "No relations predicted.\n"
+
+    # Sort relations
+    if sort_by_entity:
+        # Sort by head entity, then tail entity, then relation type
+        sorted_relations = sorted(relations, key=lambda x: (x[0], x[1], x[2]))
+    else:
+        # Sort by relation type, then entities
+        sorted_relations = sorted(relations, key=lambda x: (x[2], x[0], x[1]))
+
+    # Format output
+    lines = []
+    lines.append(f"Total relations: {len(sorted_relations)}\n")
+    lines.append("-" * 80)
+
+    for head, tail, relation in sorted_relations:
+        lines.append(f"[{head}] -- {relation} -> [{tail}]")
+
+    return "\n".join(lines)
+
+
+def process_brat_files(test_dir: str,
+                       output_dir: str,
+                       inference_model: 'DreeamInference',
+                       max_files: Optional[int] = None,
+                       verbose: bool = False) -> None:
+    """
+    Process BRAT format files and generate relation predictions.
+
+    Args:
+        test_dir: Directory containing .txt and .ann files
+        output_dir: Directory to write output files
+        inference_model: Initialized DreeamInference instance
+        max_files: Maximum number of files to process (for testing)
+        verbose: Print verbose output
+    """
+    # Create output directory
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Find all .txt files
+    txt_files = sorted([f for f in os.listdir(test_dir) if f.endswith('.txt')])
+
+    if max_files:
+        txt_files = txt_files[:max_files]
+
+    print(f"Found {len(txt_files)} files to process")
+
+    # Process each file
+    for txt_file in txt_files:
+        txt_path = os.path.join(test_dir, txt_file)
+        ann_path = os.path.join(test_dir, txt_file.replace('.txt', '.ann'))
+
+        # Parse BRAT files
+        text, entities, file_id = parse_brat_file(txt_path, ann_path)
+
+        if verbose:
+            print(f"\nProcessing: {file_id}")
+            print(f"  Text length: {len(text)} chars")
+            print(f"  Entities: {len(entities)}")
+
+        # Skip if insufficient entities
+        if len(entities) < 2:
+            if verbose:
+                print(f"  Skipping (insufficient entities)")
+            continue
+
+        # Predict relations
+        try:
+            relations = inference_model.predict_single(text, entities, file_id)
+
+            if verbose:
+                print(f"  Predicted relations: {len(relations)}")
+
+            # Write output file
+            output_path = os.path.join(output_dir, f"{file_id}_relations.txt")
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(f"File: {file_id}\n")
+                f.write(f"Text: {text[:100]}...\n\n") if len(text) > 100 else f.write(f"Text: {text}\n\n")
+                f.write(f"Entities ({len(entities)}):\n")
+
+                # Sort entities by position
+                sorted_entities = sorted(entities, key=lambda e: (e['start'], e['type'], e['end']))
+                for i, entity in enumerate(sorted_entities):
+                    f.write(f"  {i+1}. [{entity['type']}] {entity['text']} ({entity['start']}-{entity['end']})\n")
+
+                f.write("\n")
+                f.write(format_relations_readable(relations, sort_by_entity=True))
+
+            if verbose:
+                print(f"  ✓ Written to: {output_path}")
+
+        except Exception as e:
+            print(f"  Error processing {file_id}: {e}")
+            continue
+
+    print(f"\n✓ Processing complete. Output written to: {output_dir}")
+
+
+def main():
+    """Main function for command-line usage."""
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description='DREEAM Relation Extraction Inference',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Process BRAT files from directory
+  python dreeam_inference.py --test_dir ./data/test --output_dir ./output --config_path ./nerel-config.json
+
+  # Process with verbose output
+  python dreeam_inference.py --test_dir ./data/test --output_dir ./output --config_path ./nerel-config.json --verbose
+
+  # Process only first 10 files (for testing)
+  python dreeam_inference.py --test_dir ./data/test --output_dir ./output --config_path ./nerel-config.json --max_files 10
+        """
     )
-    
-    # Example text and entities
-    text = "Иван Петров работает в компании Газпром. Он является директором отдела продаж."
-    entities = [
-        {"text": "Иван Петров", "start": 0, "end": 11, "type": "PERSON"},
-        {"text": "Газпром", "start": 33, "end": 40, "type": "ORGANIZATION"}
-    ]
-    
-    # Predict relations
-    relations = inference.predict_single(text, entities)
-    
-    print("Predicted relations:")
-    for head, tail, relation in relations:
-        print(f"{head} -> {relation} -> {tail}")    
+
+    parser.add_argument('--test_dir', type=str, required=True,
+                        help='Path to directory containing .txt and .ann files')
+    parser.add_argument('--output_dir', type=str, required=True,
+                        help='Path to output directory for predictions')
+    parser.add_argument('--config_path', type=str, default='./nerel-config.json',
+                        help='Path to model configuration file (default: ./nerel-config.json)')
+    parser.add_argument('--max_files', type=int, default=None,
+                        help='Maximum number of files to process (for testing)')
+    parser.add_argument('--verbose', action='store_true',
+                        help='Print verbose output')
+    parser.add_argument('--device', type=str, default='auto',
+                        choices=['auto', 'cuda', 'cpu'],
+                        help='Device to use for inference (default: auto)')
+
+    args = parser.parse_args()
+
+    # Validate input directory
+    if not os.path.exists(args.test_dir):
+        print(f"Error: Test directory not found: {args.test_dir}")
+        return 1
+
+    # Validate config file
+    if not os.path.exists(args.config_path):
+        print(f"Error: Config file not found: {args.config_path}")
+        return 1
+
+    # Initialize inference model
+    print("=" * 80)
+    print("DREEAM Relation Extraction Inference")
+    print("=" * 80)
+    print(f"Config: {args.config_path}")
+    print(f"Test directory: {args.test_dir}")
+    print(f"Output directory: {args.output_dir}")
+    print(f"Device: {args.device}")
+    print("=" * 80)
+    print("\nInitializing model...")
+
+    try:
+        inference = DreeamInference(
+            config_path=args.config_path,
+            device=args.device
+        )
+        print("✓ Model loaded successfully!\n")
+    except Exception as e:
+        print(f"Error loading model: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
+
+    # Process files
+    try:
+        process_brat_files(
+            test_dir=args.test_dir,
+            output_dir=args.output_dir,
+            inference_model=inference,
+            max_files=args.max_files,
+            verbose=args.verbose
+        )
+        return 0
+    except Exception as e:
+        print(f"Error during processing: {e}")
+        import traceback
+        traceback.print_exc()
+        return 1
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(main())    

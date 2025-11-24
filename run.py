@@ -542,9 +542,10 @@ def main():
         model.load_state_dict(state_dict)
         print("✓ Checkpoint loaded successfully")
 
-    # Enable torch.compile for 30-50% faster inference (PyTorch 2.0+)
+    # Enable torch.compile for faster inference (PyTorch 2.0+)
+    # Note: Disabled by default due to large compilation overhead with small batches
     # Note: Must be done AFTER loading checkpoint to avoid key mismatch
-    if hasattr(torch, 'compile') and not args.do_train:
+    if hasattr(torch, 'compile') and not args.do_train and getattr(args, 'use_compile', False):
         print("✓ Compiling model with torch.compile for faster inference...")
         model = torch.compile(model)
         print("✓ Model compiled successfully")

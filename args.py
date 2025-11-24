@@ -91,6 +91,10 @@ def add_args(parser):
     parser.add_argument("--threshold_step", type=float, default=0.05,
                         help="Step size for threshold grid search (default: 0.05).")
 
+    # Compilation parameters
+    parser.add_argument("--use_compile", action="store_true",
+                        help="Enable torch.compile for faster inference (adds compilation overhead, disable for batch_size=1).")
+
     # Document chunking parameters
     parser.add_argument("--use_chunking", action="store_true",
                         help="Enable document chunking for long sequences.")

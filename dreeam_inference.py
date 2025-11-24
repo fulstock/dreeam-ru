@@ -142,7 +142,12 @@ class DreeamInference:
         if os.path.exists(checkpoint_path):
             # Load state dict and handle missing keys gracefully
             state_dict = torch.load(checkpoint_path, map_location=self.device)
-            
+
+            # Handle compiled model checkpoints (strip _orig_mod. prefix if present)
+            if any(key.startswith('_orig_mod.') for key in state_dict.keys()):
+                print("✓ Detected compiled model checkpoint, stripping _orig_mod. prefix...")
+                state_dict = {key.replace('_orig_mod.', ''): value for key, value in state_dict.items()}
+
             # Handle version compatibility issues
             missing_keys, unexpected_keys = self.model.load_state_dict(state_dict, strict=False)
             

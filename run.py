@@ -525,16 +525,29 @@ def main():
                     loss_fnt=loss_fnt)
     model.to(args.device)
 
+    # Load checkpoint BEFORE compiling (if loading from checkpoint)
+    if args.load_path != "": # load model from existing checkpoint
+
+        model_path = os.path.join(args.load_path, "best.ckpt")
+        print(f"Loading checkpoint from: {model_path}")
+
+        # Load state dict
+        state_dict = torch.load(model_path, map_location=args.device)
+
+        # Handle compiled model checkpoints (strip _orig_mod. prefix if present)
+        if any(key.startswith('_orig_mod.') for key in state_dict.keys()):
+            print("✓ Detected compiled model checkpoint, stripping _orig_mod. prefix...")
+            state_dict = {key.replace('_orig_mod.', ''): value for key, value in state_dict.items()}
+
+        model.load_state_dict(state_dict)
+        print("✓ Checkpoint loaded successfully")
+
     # Enable torch.compile for 30-50% faster inference (PyTorch 2.0+)
+    # Note: Must be done AFTER loading checkpoint to avoid key mismatch
     if hasattr(torch, 'compile') and not args.do_train:
         print("✓ Compiling model with torch.compile for faster inference...")
         model = torch.compile(model)
         print("✓ Model compiled successfully")
-
-    if args.load_path != "": # load model from existing checkpoint
-
-        model_path = os.path.join(args.load_path, "best.ckpt")
-        model.load_state_dict(torch.load(model_path))
 
     if args.do_train:  # Training
 

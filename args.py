@@ -8,7 +8,7 @@ def add_args(parser):
     parser.add_argument("--model_name_or_path", default="bert-base-cased", type=str)
     parser.add_argument("--display_name", default=None, type=str)
     
-    parser.add_argument("--train_file", default="train_annotated.json", type=str)
+    parser.add_argument("--train_file", default="train.json", type=str)
     parser.add_argument("--dev_file", default="dev.json", type=str)
     parser.add_argument("--test_file", default="", type=str)
     parser.add_argument("--pred_file", default="results.json", type=str)

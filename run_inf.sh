@@ -3,8 +3,9 @@ python3 run.py \
 	--transformer_type roberta \
 	--model_name_or_path ai-forever/ruRoberta-large \
 	--display_name ruroberta-inf \
-	--load_path ./home/student1/relations/dreeam-ru/logs/nerel-ruroberta-focal/2025-11-22_01-17-02.916766 \ \
+	--load_path ./home/student1/relations/dreeam-ru/logs/nerel-ruroberta-focal/2025-11-22_01-17-02.916766 \
 	--eval_mode single \
+	--train_file train.json \
 	--test_file test.json \
 	--test_batch_size 8 \
 	--num_labels 2 \

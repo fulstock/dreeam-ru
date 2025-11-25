@@ -275,7 +275,7 @@ def gen_train_facts(data_file_name, truth_dir):
 
 from collections import defaultdict
 
-def official_evaluate(tmp, path, train_file="train_annotated.json", dev_file="dev.json"):
+def official_evaluate(tmp, path, train_file="train.json", dev_file="dev.json"):
     '''
     Adapted from the official evaluation code.
     Now returns detailed per-relation metrics along with micro and macro averages.

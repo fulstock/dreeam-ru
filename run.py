@@ -200,7 +200,7 @@ def train(args, model, train_features, dev_features, id2rel):
         best_model_path = os.path.join(args.save_path, "best.ckpt")
         model.load_state_dict(torch.load(best_model_path))
 
-        dev_dataloader = DataLoader(dev_features, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False, num_workers=4, pin_memory=True, prefetch_factor=2)
+        dev_dataloader = DataLoader(dev_features, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False, num_workers=0, pin_memory=False)
 
         optimized_thresholds = optimize_per_class_thresholds(
             model=model,
@@ -222,7 +222,10 @@ def train(args, model, train_features, dev_features, id2rel):
             print(f"  Average F1 across all classes: {avg_f1*100:.2f}%")
 
 def evaluate(args, model, features, id2rel, tag="dev", optimized_thresholds=None):
-    dataloader = DataLoader(features, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False, num_workers=4, pin_memory=True, prefetch_factor=2)
+    # Use num_workers=0 for inference (faster for single-pass evaluation)
+    # Use num_workers=4 during training (amortized over many epochs)
+    num_workers = 0 if not args.do_train else 4
+    dataloader = DataLoader(features, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False, num_workers=num_workers, pin_memory=True if num_workers > 0 else False)
     preds, evi_preds = [], []
     scores, topks = [], []
     attns = []

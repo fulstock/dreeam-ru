@@ -1,9 +1,9 @@
 python3 run.py --do_train \
-    --data_dir $HOME/data/relations/NEREL/naa-docred-split \
+    --data_dir /home/student1/data/relations/NEREL-2part-docred \
     --transformer_type roberta \
     --model_name_or_path ai-forever/ruRoberta-large \
-    --display_name nerel-ruroberta-optimized \
-    --save_path ./logs/nerel-ruroberta-optimized \
+    --display_name nerel2part-ruroberta \
+    --save_path ./logs/nerel2part-ruroberta \
     --train_file train.json \
     --dev_file dev.json \
     --test_file test.json \
@@ -16,7 +16,7 @@ python3 run.py --do_train \
     --evi_thresh 0.2 \
     --evi_lambda 0.05 \
     --warmup_ratio 0.06 \
-    --num_train_epochs 160 \
+    --num_train_epochs 1 \
     --seed 7777 \
     --num_class 48 \
     --max_seq_length 1460 \

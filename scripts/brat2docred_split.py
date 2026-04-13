@@ -23,7 +23,9 @@ word_tokenizer = NLTKWordTokenizer()
 morph = pymorphy2.MorphAnalyzer()
 
 brat2mrc_parser = argparse.ArgumentParser(description = "Brat to docred formatter script.")
-brat2mrc_parser.add_argument('--brat_dataset_path', type = str, required = True, help = "Path to brat dataset (with train, dev, test dirs).")
+brat2mrc_parser.add_argument('--brat_dataset_path', type = str, required = True, help = "Path to brat dataset. Either a parent dir with train/dev/test subdirs, or a flat dir with .txt/.ann files (use --subsets none).")
+brat2mrc_parser.add_argument('--subsets', type = str, default = "train,dev,test", help = "Comma-separated subset dirs to convert (default: train,dev,test). Use 'none' if brat_dataset_path is a flat directory with .txt/.ann files directly.")
+brat2mrc_parser.add_argument('--output_name', type = str, default = None, help = "Output JSON filename (without .json extension). Only used with --subsets none. Default: 'train'.")
 brat2mrc_parser.add_argument('--ner_path', type = str, required = True, help = 'Path to ner tags file with format ["CLASS1", "CLASS2", ...].')
 brat2mrc_parser.add_argument('--rel_path', type = str, required = True, help = 'Path to relation tags file with format ["CLASS1", "CLASS2", ...].')
 brat2mrc_parser.add_argument('--docred_output_path', type = str, default = None, help = "Path, where formatted dataset would be stored. By default, same path as in --brat_dataset_path would be used.")
@@ -84,19 +86,21 @@ ner2id = {tag : tid for tid, tag in enumerate(ner_tags)}
 with open(os.path.join(docred_output_path, "ner2id.json"), "w") as ner2id_file:
     json.dump(ner2id, ner2id_file, ensure_ascii = False)
 
-sets = ["train", "dev", "test"]
-# sets = [""]
+if args.subsets.strip().lower() == "none":
+    sets = [""]
+else:
+    sets = args.subsets.split(',')
 
 for ds in sets:
 
     dataset_path = os.path.join(brat_dataset_path, ds)
 
-    if not os.path.exists(dataset_path):
+    if len(ds) > 0:
+        print("Converting " + ds + " set:")
+    else:
         dataset_path = brat_dataset_path
-        sets = []
-        ds = "test"
-
-    print(ds + " set:")
+        ds = args.output_name or "train"
+        print("Converting flat directory -> " + ds + ".json")
 
     total_relations_count = 0
     total_entity_mentions_count = 0
@@ -209,10 +213,6 @@ for ds in sets:
                     global_doc_data["sents"] = tokenized_sentences
  
                     total_length = sum([len(s) for s in tokenized_sentences])
-                    print(len(tokenized_sentences))
-                    print([len(s) for s in tokenized_sentences])
-
-                    print(total_length)
                     if total_length > 512:
                         split = True
                         first_idx = 0
@@ -223,8 +223,6 @@ for ds in sets:
                             if curr_len > split_length:
                                 last_idx = s_idx
                                 
-                                print(first_idx, last_idx, len(tokenized_sentences[first_idx : last_idx]), [len(sti) for sti in tokenized_sentences[first_idx : last_idx]], sum([len(sti) for sti in tokenized_sentences[first_idx : last_idx]]))
-        
                                 doc_datas.append({
                                     "title" : global_doc_data["title"] + "_part" + str(spk),
                                     "part" : spk,
@@ -234,20 +232,15 @@ for ds in sets:
                                 spk += 1
 
                                 first_idx = s_idx - split_diff
-                                print(s_idx)
                                 prev_len = sum([len(prev_sent) for prev_sent in tokenized_sentences[first_idx:s_idx + 1]])
                                 while prev_len > split_length:
-                                    print(first_idx, s_idx + 1, prev_len)
                                     first_idx += 1
                                     prev_len = sum([len(prev_sent) for prev_sent in tokenized_sentences[first_idx:s_idx + 1]])
-                                print(first_idx)
                                 curr_len = prev_len
 
                         if curr_len > 0:
                             last_idx = len(tokenized_sentences)
                                     
-                            print(first_idx, last_idx, len(tokenized_sentences[first_idx : last_idx]), [len(sti) for sti in tokenized_sentences[first_idx : last_idx]], sum([len(sti) for sti in tokenized_sentences[first_idx : last_idx]]))
-
                             doc_datas.append({
                                 "title" : global_doc_data["title"] + "_part" + str(spk),
                                 "part" : spk,
@@ -265,12 +258,6 @@ for ds in sets:
                             "global_sents_ids" : list(range(0, len(tokenized_sentences)))
                         }]
 
-                    print([len(doc_data["sents"]) for doc_data in doc_datas])
-                    print([sum([len(s) for s in doc_data["sents"]]) for doc_data in doc_datas])
-                    print([[len(s) for s in doc_data["sents"]] for doc_data in doc_datas])
-
-                    # exit(1)
-                    
                     for entity_mentions_id, entity_type, start_char, end_char in zip(entity_mentions_ids, entity_types, entity_start_chars, entity_end_chars):
 
                         entity_mention = txtdata[start_char : end_char]
@@ -400,9 +387,6 @@ for ds in sets:
 
                     # print(doc_datas[5])
 
-                    print([len(doc_datas[part]["vertexSet"]) for part, doc_data in enumerate(doc_datas)])
-                    # print([doc_datas[part]["vertexSet"] for part, doc_data in enumerate(doc_datas)])
-
                     for part, doc_data in enumerate(doc_datas):
 
                         curr_mention_ids = [m["mention_id"] for v in doc_datas[part]["vertexSet"] for m in v]
@@ -450,6 +434,3 @@ for ds in sets:
 
     json.dump(docs_data, jsonfile, ensure_ascii = False, indent = 2)
     jsonfile.close()
-
-    if ds == "test":
-        break

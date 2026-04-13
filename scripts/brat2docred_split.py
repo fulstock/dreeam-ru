@@ -7,7 +7,10 @@ from nltk.tokenize import NLTKWordTokenizer
 
 from tqdm.auto import tqdm
 
-import pymorphy2
+try:
+    import pymorphy3 as pymorphy2
+except ImportError:
+    import pymorphy2
 
 # # ## Закомментируйте после первой загрузки пакета. 
 # import nltk

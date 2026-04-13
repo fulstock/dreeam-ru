@@ -7,7 +7,10 @@ from nltk.tokenize import NLTKWordTokenizer
 
 from tqdm.auto import tqdm
 
-import pymorphy2
+try:
+    import pymorphy3 as pymorphy2
+except ImportError:
+    import pymorphy2
 
 # # ## Закомментируйте после первой загрузки пакета. 
 # import nltk
@@ -20,8 +23,9 @@ word_tokenizer = NLTKWordTokenizer()
 morph = pymorphy2.MorphAnalyzer()
 
 brat2mrc_parser = argparse.ArgumentParser(description = "Brat to docred formatter script.")
-brat2mrc_parser.add_argument('--brat_dataset_path', type = str, required = True, help = "Path to brat dataset (with train, dev, test dirs).")
-brat2mrc_parser.add_argument('--subsets', type = str, default = "train,dev,test", help = "Subsets to convert, by default equals ['train', 'dev', 'test']. Should be None if a brat_dataset_path is a subset.")
+brat2mrc_parser.add_argument('--brat_dataset_path', type = str, required = True, help = "Path to brat dataset. Either a parent dir with train/dev/test subdirs, or a flat dir with .txt/.ann files (use --subsets none).")
+brat2mrc_parser.add_argument('--subsets', type = str, default = "train,dev,test", help = "Comma-separated subset dirs to convert (default: train,dev,test). Use 'none' if brat_dataset_path is a flat directory with .txt/.ann files directly.")
+brat2mrc_parser.add_argument('--output_name', type = str, default = None, help = "Output JSON filename (without .json extension). Only used with --subsets none. Default: 'train'.")
 brat2mrc_parser.add_argument('--ner_path', type = str, required = True, help = 'Path to ner tags file with format ["CLASS1", "CLASS2", ...].')
 brat2mrc_parser.add_argument('--rel_path', type = str, required = True, help = 'Path to relation tags file with format ["CLASS1", "CLASS2", ...].')
 brat2mrc_parser.add_argument('--docred_output_path', type = str, default = None, help = "Path, where formatted dataset would be stored. By default, same path as in --brat_dataset_path would be used.")
@@ -73,9 +77,10 @@ ner2id = {tag : tid for tid, tag in enumerate(ner_tags)}
 with open(os.path.join(docred_output_path, "ner2id.json"), "w") as ner2id_file:
     json.dump(ner2id, ner2id_file, ensure_ascii = False)
 
-sets = args.subsets.split(',')
-if sets is None:
+if args.subsets.strip().lower() == "none":
     sets = [""]
+else:
+    sets = args.subsets.split(',')
     
 for ds in sets:
 
@@ -90,8 +95,8 @@ for ds in sets:
     if len(ds) > 0:
         print("Converting " + ds + " set:")
     else:
-        print("Converting.")
-        ds = "dataset"
+        ds = args.output_name or "train"
+        print("Converting flat directory -> " + ds + ".json")
 
     jsonpath = os.path.join(docred_output_path, ds + ".json")
     jsondir = os.path.dirname(jsonpath)

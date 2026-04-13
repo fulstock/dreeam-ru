@@ -203,7 +203,7 @@ def train(args, model, train_features, dev_features, id2rel):
         best_model_path = os.path.join(args.save_path, "best.ckpt")
         model.load_state_dict(torch.load(best_model_path))
 
-        dev_dataloader = DataLoader(dev_features, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False, num_workers=4, pin_memory=True, prefetch_factor=2)
+        dev_dataloader = DataLoader(dev_features, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False, num_workers=0, pin_memory=False)
 
         optimized_thresholds = optimize_per_class_thresholds(
             model=model,
@@ -225,7 +225,10 @@ def train(args, model, train_features, dev_features, id2rel):
             print(f"  Average F1 across all classes: {avg_f1*100:.2f}%")
 
 def evaluate(args, model, features, id2rel, tag="dev", optimized_thresholds=None):
-    dataloader = DataLoader(features, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False, num_workers=4, pin_memory=True, prefetch_factor=2)
+    # Use num_workers=0 for inference (faster for single-pass evaluation)
+    # Use num_workers=4 during training (amortized over many epochs)
+    num_workers = 0 if not args.do_train else 4
+    dataloader = DataLoader(features, batch_size=args.test_batch_size, shuffle=False, collate_fn=collate_fn, drop_last=False, num_workers=num_workers, pin_memory=True if num_workers > 0 else False)
     preds, evi_preds = [], []
     scores, topks = [], []
     attns = []
@@ -539,16 +542,30 @@ def main():
                     loss_fnt=loss_fnt)
     model.to(args.device)
 
-    # Enable torch.compile for 30-50% faster inference (PyTorch 2.0+)
-    if hasattr(torch, 'compile') and not args.do_train:
-        print("✓ Compiling model with torch.compile for faster inference...")
-        model = torch.compile(model)
-        print("✓ Model compiled successfully")
-
+    # Load checkpoint BEFORE compiling (if loading from checkpoint)
     if args.load_path != "": # load model from existing checkpoint
 
         model_path = os.path.join(args.load_path, "best.ckpt")
-        model.load_state_dict(torch.load(model_path))
+        print(f"Loading checkpoint from: {model_path}")
+
+        # Load state dict
+        state_dict = torch.load(model_path, map_location=args.device)
+
+        # Handle compiled model checkpoints (strip _orig_mod. prefix if present)
+        if any(key.startswith('_orig_mod.') for key in state_dict.keys()):
+            print("✓ Detected compiled model checkpoint, stripping _orig_mod. prefix...")
+            state_dict = {key.replace('_orig_mod.', ''): value for key, value in state_dict.items()}
+
+        model.load_state_dict(state_dict)
+        print("✓ Checkpoint loaded successfully")
+
+    # Enable torch.compile for faster inference (PyTorch 2.0+)
+    # Note: Disabled by default due to large compilation overhead with small batches
+    # Note: Must be done AFTER loading checkpoint to avoid key mismatch
+    if hasattr(torch, 'compile') and not args.do_train and getattr(args, 'use_compile', False):
+        print("✓ Compiling model with torch.compile for faster inference...")
+        model = torch.compile(model)
+        print("✓ Model compiled successfully")
 
     if args.do_train:  # Training
 

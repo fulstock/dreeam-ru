@@ -8,7 +8,7 @@ def add_args(parser):
     parser.add_argument("--model_name_or_path", default="bert-base-cased", type=str)
     parser.add_argument("--display_name", default=None, type=str)
     
-    parser.add_argument("--train_file", default="train_annotated.json", type=str)
+    parser.add_argument("--train_file", default="train.json", type=str)
     parser.add_argument("--dev_file", default="dev.json", type=str)
     parser.add_argument("--test_file", default="", type=str)
     parser.add_argument("--pred_file", default="results.json", type=str)
@@ -97,6 +97,10 @@ def add_args(parser):
                         help="Maximum threshold for per-class optimization (default: 0.95).")
     parser.add_argument("--threshold_step", type=float, default=0.05,
                         help="Step size for threshold grid search (default: 0.05).")
+
+    # Compilation parameters
+    parser.add_argument("--use_compile", action="store_true",
+                        help="Enable torch.compile for faster inference (adds compilation overhead, disable for batch_size=1).")
 
     # Document chunking parameters
     parser.add_argument("--use_chunking", action="store_true",

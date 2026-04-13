@@ -247,9 +247,10 @@ def to_official(id2rel: dict, preds: list, features: list, evi_preds: list = [],
 
 
 def gen_train_facts(data_file_name, truth_dir):
-    
-    fact_file_name = data_file_name[data_file_name.find("train_"):]
-    fact_file_name = os.path.join(truth_dir, fact_file_name.replace(".json", ".fact"))
+
+    # Extract just the filename (not full path) for the cache file
+    base_name = os.path.basename(data_file_name)
+    fact_file_name = os.path.join(truth_dir, base_name.replace(".json", ".fact"))
 
     if os.path.exists(fact_file_name):
         fact_in_train = set([])
@@ -275,7 +276,7 @@ def gen_train_facts(data_file_name, truth_dir):
 
 from collections import defaultdict
 
-def official_evaluate(tmp, path, train_file="train_annotated.json", dev_file="dev.json"):
+def official_evaluate(tmp, path, train_file="train.json", dev_file="dev.json"):
     '''
     Adapted from the official evaluation code.
     Now returns detailed per-relation metrics along with micro and macro averages.

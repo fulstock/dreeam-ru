@@ -151,6 +151,11 @@ class DreeamInference:
             # Load state dict and inspect architecture
             state_dict = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
 
+            # Handle compiled model checkpoints (strip _orig_mod. prefix if present)
+            if any(key.startswith('_orig_mod.') for key in state_dict.keys()):
+                print("✓ Detected compiled model checkpoint, stripping _orig_mod. prefix...")
+                state_dict = {key.replace('_orig_mod.', ''): value for key, value in state_dict.items()}
+
             # Detect checkpoint architecture from state_dict
             checkpoint_vocab_size = None
             checkpoint_emb_size = None

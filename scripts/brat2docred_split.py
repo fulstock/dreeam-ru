@@ -70,9 +70,9 @@ rel2id = {}
 
 rel2id["Na"] = 0
 
-for rel_id, rel_tag in enumerate(rel_tags[1:]):
+for rel_id, rel_tag in enumerate([r for r in rel_tags[1:] if r != "ALTERNATIVE_NAME" and r != "ABBREVIATION"]):
     rel_info["P" + str(rel_id + 1)] = rel_tag
-    rel2id["P" + str(rel_id + 1)] = rel_id
+    rel2id[rel_tag] = rel_id + 1
     rel_info_inv[rel_tag] = "P" + str(rel_id + 1)
 
 with open(os.path.join(docred_output_path, "rel_info.json"), "w") as rel_info_file:
@@ -332,7 +332,7 @@ for ds in sets:
 
                     for rel_type, head_mention_id, tail_mention_id in zip(relation_types, head_mentions_ids, tail_mentions_ids):
 
-                        if rel_type != "ALTERNATIVE_NAME":
+                        if rel_type != "ALTERNATIVE_NAME" and rel_type != "ABBREVIATION":
                             continue
 
                         head_id = -1
@@ -372,6 +372,8 @@ for ds in sets:
 
                     total_entity_vertex_count += len(unique_entity_mentions)
                     for part, doc_data in enumerate(doc_datas):
+                        if "vertexSet" not in doc_datas[part]:
+                            doc_datas[part]["vertexSet"] = []
                         for vertex in list(unique_entity_mentions.values()):
                             parted_vertex = [m for m in vertex if m["part"] == part and m["global_sent_id"] in doc_data["global_sents_ids"]]
                             # print(parted_vertex, len(parted_vertex))
@@ -394,6 +396,9 @@ for ds in sets:
 
                         for rel_type, head_mention_id, tail_mention_id in zip(relation_types, head_mentions_ids, tail_mentions_ids):
 
+                            if rel_type == "ALTERNATIVE_NAME" or rel_type == "ABBREVIATION":
+                                continue
+
                             if head_mention_id not in curr_mention_ids or tail_mention_id not in curr_mention_ids:
                                 continue
 
@@ -408,14 +413,24 @@ for ds in sets:
                                     if mention["mention_id"] == tail_mention_id:
                                         tail_id = entity_id
                                         evidences.add(mention["sent_id"])
-                            
+                            if head_id == tail_id:
+                                continue
+
                             total_relations_count += 1
-                            doc_datas[part]["labels"].append({
-                                "r" : rel_type,
-                                "h" : head_id,
-                                "t" : tail_id,
-                                "evidence" : sorted(list(evidences))
-                            })
+                            same_relations = [(l_idx, l) for l_idx, l in enumerate(doc_datas[part]["labels"]) if l["r"] == rel_type and l["h"] == head_id and l["t"] == tail_id]
+                            assert len(same_relations) <= 1
+                            if len(same_relations) > 0:
+                                l_idx = same_relations[0][0]
+                                ev = set(doc_datas[part]["labels"][l_idx]["evidence"])
+                                ev.update(evidences)
+                                doc_datas[part]["labels"][l_idx]["evidence"] = sorted(list(ev))
+                            else:
+                                doc_datas[part]["labels"].append({
+                                    "r" : rel_type,
+                                    "h" : head_id,
+                                    "t" : tail_id,
+                                    "evidence" : sorted(list(evidences))
+                                })
 
                     total_split_errors += len(tokenized_sentences) - len(set([d for doc_data in doc_datas for d in doc_data["global_sents_ids"]])) 
 

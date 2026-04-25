@@ -640,6 +640,8 @@ def main():
                 if optimized_thresholds:
                     avg_f1 = sum(info['f1'] for info in optimized_thresholds.values()) / len(optimized_thresholds)
                     print(f"  Average per-class dev F1: {avg_f1*100:.2f}%")
+                # Flatten to {rel_id: threshold} format expected by apply_per_class_thresholds
+                optimized_thresholds = load_optimized_thresholds(threshold_path)
 
         # print(test_features[0]['sent_labels'])
 

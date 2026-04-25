@@ -615,8 +615,31 @@ def main():
                 optimized_thresholds = load_optimized_thresholds(threshold_path)
                 print(f"✓ Loaded optimized thresholds from {threshold_path}")
             else:
-                print(f"⚠ Warning: --use_per_class_thresholds enabled but no optimized_thresholds.json found in {args.load_path}")
-                print(f"  Will use standard threshold from loss function")
+                print(f"\n=== Generating Per-Class Thresholds from Dev Set ===")
+                dev_file = os.path.join(args.data_dir, args.dev_file)
+                dev_features = read(args.data_dir, dev_file, tokenizer,
+                                    transformer_type=args.transformer_type,
+                                    max_seq_length=args.max_seq_length,
+                                    use_chunking=args.use_chunking,
+                                    chunk_size=args.chunk_size,
+                                    chunk_overlap=args.chunk_overlap,
+                                    max_sent_num=args.max_sent_num)
+                dev_dataloader = DataLoader(dev_features, batch_size=args.test_batch_size,
+                                            shuffle=False, collate_fn=collate_fn,
+                                            drop_last=False, num_workers=0, pin_memory=False)
+                optimized_thresholds = optimize_per_class_thresholds(
+                    model=model,
+                    dev_dataloader=dev_dataloader,
+                    id2rel=id2rel,
+                    device=args.device,
+                    threshold_range=(args.threshold_range_min, args.threshold_range_max),
+                    threshold_step=args.threshold_step,
+                )
+                save_optimized_thresholds(optimized_thresholds, threshold_path)
+                print(f"✓ Saved optimized thresholds to {threshold_path}")
+                if optimized_thresholds:
+                    avg_f1 = sum(info['f1'] for info in optimized_thresholds.values()) / len(optimized_thresholds)
+                    print(f"  Average per-class dev F1: {avg_f1*100:.2f}%")
 
         # print(test_features[0]['sent_labels'])
 
@@ -625,8 +648,9 @@ def main():
             test_scores, test_output, official_results, results, detailed_metrics = evaluate(args, model, test_features, id2rel, tag="test", optimized_thresholds=optimized_thresholds)
             # wandb.log(test_scores)
 
+            pred_basename = os.path.splitext(args.pred_file)[0]
             offi_path = os.path.join(args.load_path, args.pred_file)
-            score_path = os.path.join(args.load_path, f"{basename}_scores.csv")
+            score_path = os.path.join(args.load_path, f"{basename}_{pred_basename}_scores.csv")
             res_path = os.path.join(args.load_path, f"topk_{args.pred_file}")
 
             dump_to_file(official_results, offi_path, test_output, score_path, results, res_path, detailed_metrics=detailed_metrics)          

@@ -1,0 +1,23 @@
+{
+	"transformer_type": "roberta",
+	"model_name_or_path": "ai-forever/ruRoberta-large",
+	"model_path": "./logs/bionne-r-ruroberta/2026-04-24_18-23-06.915501/best.ckpt",
+	"rel2id": "/path/on/server/ru-docred/rel2id.json",
+	"num_labels": 2,
+	"num_class": 13,
+	"evi_thresh": 0.2,
+	"max_seq_length": 1280,
+	"max_sent_num": 24,
+	"batch_size": 4,
+	"use_amtl": false,
+	"num_segments": 2,
+	"lambda_weight": 1.5,
+	"use_effective_number": false,
+	"beta": 0.999,
+	"use_negative_sampling": false,
+	"neg_pos_ratio": 3.0,
+	"use_per_class_thresholds": false,
+	"threshold_range_min": 0.1,
+	"threshold_range_max": 0.95,
+	"threshold_step": 0.05
+}

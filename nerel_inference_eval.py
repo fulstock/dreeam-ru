@@ -262,7 +262,11 @@ def extract_gold_relations(parsed_data: Dict) -> Set[Tuple[str, str, str]]:
         arg1_id = relation['arg1']
         arg2_id = relation['arg2']
         rel_type = relation['type']
-        
+
+        # Skip mention-merge relations (not predicted by the model)
+        if rel_type in ('ABBREVIATION', 'ALTERNATIVE_NAME'):
+            continue
+
         if arg1_id in parsed_data['entities'] and arg2_id in parsed_data['entities']:
             head_text = parsed_data['entities'][arg1_id]['text']
             tail_text = parsed_data['entities'][arg2_id]['text']

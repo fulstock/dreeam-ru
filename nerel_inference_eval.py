@@ -83,9 +83,12 @@ class BRATParser:
         
         if len(entity_info) >= 3:
             entity_type = entity_info[0]
+            # Skip discontinuous spans (BRAT syntax: "121;144 154 200")
+            if ';' in entity_info[1] or ';' in entity_info[2]:
+                return
             start_pos = int(entity_info[1])
             end_pos = int(entity_info[2])
-            
+
             self.entities[entity_id] = {
                 'id': entity_id,
                 'type': entity_type,

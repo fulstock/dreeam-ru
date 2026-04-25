@@ -136,7 +136,7 @@ class NERELEvaluator:
         # Store detailed predictions for error analysis
         self.detailed_predictions = []
         
-    def add_predictions(self, gold_relations: Set[Tuple], pred_relations: Set[Tuple], file_id: str = None, text: str = None):
+    def add_predictions(self, gold_relations: Set[Tuple], pred_relations: Set[Tuple], file_id: str = None, text: str = None, entity_types_by_text: Dict[str, str] = None):
         """
         Add predictions for evaluation.
 
@@ -145,6 +145,7 @@ class NERELEvaluator:
             pred_relations: Set of predicted relation tuples (head_text, tail_text, relation_type)
             file_id: File identifier for tracking predictions
             text: Original text for context
+            entity_types_by_text: Optional {entity_text: entity_type} lookup for readable error reports
         """
 
         # Calculate metrics
@@ -165,6 +166,7 @@ class NERELEvaluator:
             'true_positives': list(tp_relations),
             'false_positives': list(fp_relations),
             'false_negatives': list(fn_relations),
+            'entity_types_by_text': entity_types_by_text or {},
             'metrics': {
                 'tp_count': len(tp_relations),
                 'fp_count': len(fp_relations),
@@ -339,8 +341,11 @@ def process_nerel_files(test_dir: str,
             pred_relations_list = inference_model.predict_single(text, entities, base_name)
             pred_relations = set(pred_relations_list)
             
+            # Build {entity_text: entity_type} lookup for readable error report
+            entity_types_by_text = {e['text']: e['type'] for e in entities}
+
             # Evaluate
-            evaluator.add_predictions(gold_relations, pred_relations, base_name, text)
+            evaluator.add_predictions(gold_relations, pred_relations, base_name, text, entity_types_by_text)
             
             total_gold_relations += len(gold_relations)
             total_pred_relations += len(pred_relations)
@@ -480,6 +485,61 @@ def save_detailed_predictions(evaluator: NERELEvaluator, output_path: str):
         json.dump(predictions_data, f, indent=2, ensure_ascii=False)
 
 
+def save_error_analysis_txt(evaluator: NERELEvaluator, output_path: str):
+    """
+    Save error analysis in a human-readable text format, grouped per file
+    and within each file by (head_type → tail_type, relation_type).
+    """
+    UNKNOWN_TYPE = '?'
+
+    def group_relations(rel_set, types_by_text):
+        # group: {(head_type, tail_type, rel_type): [(head_text, tail_text), ...]}
+        groups = defaultdict(list)
+        for head, tail, rel_type in rel_set:
+            ht = types_by_text.get(head, UNKNOWN_TYPE)
+            tt = types_by_text.get(tail, UNKNOWN_TYPE)
+            groups[(ht, tt, rel_type)].append((head, tail))
+        return groups
+
+    def write_section(f, title, rel_set, types_by_text):
+        f.write(f"\n>>> {title} — {len(rel_set)} total\n\n")
+        if not rel_set:
+            f.write("  (none)\n")
+            return
+        groups = group_relations(rel_set, types_by_text)
+        # sort groups: by relation, then head_type, then tail_type
+        for (ht, tt, rel_type) in sorted(groups.keys(), key=lambda k: (k[2], k[0], k[1])):
+            instances = sorted(groups[(ht, tt, rel_type)])
+            head_pad = max(len(h) for h, _ in instances)
+            f.write(f"  [{ht} → {tt}]   {rel_type}\n")
+            for head, tail in instances:
+                f.write(f"    {head:<{head_pad}}   ->   {tail}\n")
+            f.write("\n")
+
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write("FP/FN ERROR ANALYSIS — per file, grouped by (head_type → tail_type, relation)\n")
+        f.write("Each `===` line marks the start of a new file's section.\n")
+
+        for prediction in evaluator.detailed_predictions:
+            file_id = prediction['file_id']
+            tp = prediction['metrics']['tp_count']
+            fp = prediction['metrics']['fp_count']
+            fn = prediction['metrics']['fn_count']
+            types_by_text = prediction.get('entity_types_by_text', {})
+
+            # Skip files with no errors at all
+            if fp == 0 and fn == 0:
+                continue
+
+            f.write("\n\n" + "=" * 80 + "\n")
+            f.write(f"FILE: {file_id}     (TP={tp}, FP={fp}, FN={fn})\n")
+
+            write_section(f, "FALSE POSITIVES (model predicted, not in gold)",
+                          prediction['false_positives'], types_by_text)
+            write_section(f, "FALSE NEGATIVES (in gold, model missed)",
+                          prediction['false_negatives'], types_by_text)
+
+
 def save_error_analysis_csv(evaluator: NERELEvaluator, output_path: str):
     """Save error analysis in CSV format for easy manual review."""
 
@@ -521,6 +581,8 @@ def main():
                       help='Output JSON file with detailed predictions for error analysis')
     parser.add_argument('--errors_csv', default='nerel_error_analysis.csv',
                       help='Output CSV file with error analysis (FP/FN breakdown)')
+    parser.add_argument('--errors_txt', default='nerel_error_analysis.txt',
+                      help='Output TXT file with human-readable FP/FN breakdown grouped by type-pair + relation')
     parser.add_argument('--verbose', action='store_true',
                       help='Print verbose output')
     
@@ -589,8 +651,11 @@ def main():
             pred_relations_list = inference_model.predict_single(text, entities, base_name)
             pred_relations = set(pred_relations_list)
 
+            # Build {entity_text: entity_type} lookup for readable error report
+            entity_types_by_text = {e['text']: e['type'] for e in entities}
+
             # Evaluate
-            evaluator.add_predictions(gold_relations, pred_relations, base_name, text)
+            evaluator.add_predictions(gold_relations, pred_relations, base_name, text, entity_types_by_text)
 
             total_gold_relations += len(gold_relations)
             total_pred_relations += len(pred_relations)
@@ -631,14 +696,18 @@ def main():
     # Save error analysis CSV
     save_error_analysis_csv(evaluator, args.errors_csv)
 
+    # Save human-readable error analysis TXT
+    save_error_analysis_txt(evaluator, args.errors_txt)
+
     print(f"\nDetailed results saved to: {args.output_file}")
     print(f"CSV results saved to: {args.csv_output}")
     print(f"Detailed predictions saved to: {args.predictions_output}")
     print(f"Error analysis CSV saved to: {args.errors_csv}")
+    print(f"Readable error analysis saved to: {args.errors_txt}")
     print(f"\nFor manual error analysis:")
-    print(f"- Open {args.errors_csv} to see all false positives and false negatives")
+    print(f"- Open {args.errors_txt} for grouped, human-readable FP/FN inspection")
+    print(f"- Open {args.errors_csv} to filter/sort all FP/FN in Excel")
     print(f"- Open {args.predictions_output} for detailed per-file predictions")
-    print(f"- CSV files can be opened in Excel for easy analysis")
 
 
 if __name__ == "__main__":

@@ -10,10 +10,66 @@ import os
 import json
 import re
 import csv
-from typing import Dict, List, Tuple, Set
+from typing import Dict, List, Tuple, Set, Optional
 from collections import defaultdict, Counter
 from dreeam_inference import DreeamInference
 import argparse
+
+
+class AnnotationRuleParser:
+    """Parse NEREL annotation.conf [relations] section into {relation: (arg1_types, arg2_types)}."""
+
+    def __init__(self, conf_path: str):
+        self.relation_rules: Dict[str, Tuple[Set[str], Set[str]]] = {}
+        in_relations = False
+        with open(conf_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                if line == '[relations]':
+                    in_relations = True
+                    continue
+                if line.startswith('[') and in_relations:
+                    break
+                if not in_relations or not line or line.startswith('#'):
+                    continue
+                self._parse_line(line)
+
+    def _parse_line(self, line: str):
+        parts = line.split('\t')
+        if len(parts) < 2:
+            parts = re.split(r'\s{2,}', line)
+        if len(parts) < 2:
+            return
+        rel_name = parts[0].strip()
+        args_str = parts[1].strip()
+        arg_parts = args_str.split(',')
+        if len(arg_parts) != 2:
+            return
+        arg1_match = re.search(r'Arg1:(.+)', arg_parts[0])
+        arg2_match = re.search(r'Arg2:(.+)', arg_parts[1])
+        if not arg1_match or not arg2_match:
+            return
+        arg1_types = self._parse_type_list(arg1_match.group(1).strip())
+        arg2_types = self._parse_type_list(arg2_match.group(1).strip())
+        self.relation_rules[rel_name] = (arg1_types, arg2_types)
+
+    def _parse_type_list(self, s: str) -> Set[str]:
+        if '<ENTITY>' in s or '<ANY>' in s:
+            return {'<ANY>'}
+        out = set()
+        for t in s.split('|'):
+            t = t.strip()
+            if ':' in t:
+                t = t.split(':')[1]
+            out.add(t)
+        return out
+
+    def is_valid(self, relation: str, h_type: str, t_type: str) -> bool:
+        """True if this (h_type, relation, t_type) combination is allowed by the schema."""
+        if relation not in self.relation_rules:
+            return True  # unknown relation — don't filter
+        a1, a2 = self.relation_rules[relation]
+        return ('<ANY>' in a1 or h_type in a1) and ('<ANY>' in a2 or t_type in a2)
 
 
 class BRATParser:
@@ -485,10 +541,17 @@ def save_detailed_predictions(evaluator: NERELEvaluator, output_path: str):
         json.dump(predictions_data, f, indent=2, ensure_ascii=False)
 
 
-def save_error_analysis_txt(evaluator: NERELEvaluator, output_path: str):
+def save_error_analysis_txt(evaluator: NERELEvaluator, output_path: str,
+                            rules: Optional['AnnotationRuleParser'] = None):
     """
     Save error analysis in a human-readable text format, grouped per file
     and within each file by (head_type → tail_type, relation_type).
+
+    If `rules` is provided:
+      - FALSE POSITIVES are split into "schema-valid" (review-worthy) and
+        "schema-violating" (clearly model errors, hidden in summary count).
+      - GOLD VIOLATIONS are listed separately — gold relations whose type
+        combination violates the schema (likely annotation errors).
     """
     UNKNOWN_TYPE = '?'
 
@@ -516,9 +579,30 @@ def save_error_analysis_txt(evaluator: NERELEvaluator, output_path: str):
                 f.write(f"    {head:<{head_pad}}   ->   {tail}\n")
             f.write("\n")
 
+    def partition_by_validity(rel_set, types_by_text):
+        """Return (valid_set, invalid_set) per the rules."""
+        if rules is None:
+            return rel_set, set()
+        valid, invalid = set(), set()
+        for head, tail, rel_type in rel_set:
+            ht = types_by_text.get(head, UNKNOWN_TYPE)
+            tt = types_by_text.get(tail, UNKNOWN_TYPE)
+            if ht == UNKNOWN_TYPE or tt == UNKNOWN_TYPE:
+                valid.add((head, tail, rel_type))  # can't judge -> keep
+            elif rules.is_valid(rel_type, ht, tt):
+                valid.add((head, tail, rel_type))
+            else:
+                invalid.add((head, tail, rel_type))
+        return valid, invalid
+
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write("FP/FN ERROR ANALYSIS — per file, grouped by (head_type → tail_type, relation)\n")
         f.write("Each `===` line marks the start of a new file's section.\n")
+        if rules is not None:
+            f.write("\nSchema filtering ON — predictions violating annotation.conf type constraints\n")
+            f.write("are dropped from FALSE POSITIVES (clearly model errors, not annotation gaps).\n")
+            f.write("Gold relations violating type constraints are listed under GOLD VIOLATIONS\n")
+            f.write("(likely real annotation errors that should be reviewed).\n")
 
         for prediction in evaluator.detailed_predictions:
             file_id = prediction['file_id']
@@ -527,17 +611,40 @@ def save_error_analysis_txt(evaluator: NERELEvaluator, output_path: str):
             fn = prediction['metrics']['fn_count']
             types_by_text = prediction.get('entity_types_by_text', {})
 
-            # Skip files with no errors at all
-            if fp == 0 and fn == 0:
+            fps = set(map(tuple, prediction['false_positives']))
+            fns = set(map(tuple, prediction['false_negatives']))
+            golds = set(map(tuple, prediction['gold_relations']))
+
+            fps_valid, fps_invalid = partition_by_validity(fps, types_by_text)
+            golds_valid, golds_invalid = partition_by_validity(golds, types_by_text)
+
+            # If schema filtering on, FNs that violate schema are also surfaced
+            # (those are gold errors, not model misses)
+            fns_for_review = fns - golds_invalid if rules is not None else fns
+
+            review_fp = len(fps_valid)
+            review_fn = len(fns_for_review)
+            n_gold_violations = len(golds_invalid)
+            n_dropped_fp = len(fps_invalid)
+
+            # Skip files with nothing to review
+            if review_fp == 0 and review_fn == 0 and n_gold_violations == 0:
                 continue
 
             f.write("\n\n" + "=" * 80 + "\n")
-            f.write(f"FILE: {file_id}     (TP={tp}, FP={fp}, FN={fn})\n")
+            header = f"FILE: {file_id}     (TP={tp}, FP={fp}, FN={fn}"
+            if rules is not None:
+                header += f"  |  review_FP={review_fp}, review_FN={review_fn}, gold_violations={n_gold_violations}, dropped_FP={n_dropped_fp}"
+            header += ")"
+            f.write(header + "\n")
 
-            write_section(f, "FALSE POSITIVES (model predicted, not in gold)",
-                          prediction['false_positives'], types_by_text)
+            write_section(f, "FALSE POSITIVES (model predicted, not in gold; schema-valid)" if rules else "FALSE POSITIVES (model predicted, not in gold)",
+                          fps_valid, types_by_text)
             write_section(f, "FALSE NEGATIVES (in gold, model missed)",
-                          prediction['false_negatives'], types_by_text)
+                          fns_for_review, types_by_text)
+            if rules is not None and n_gold_violations > 0:
+                write_section(f, "GOLD VIOLATIONS (gold relations violating annotation.conf — review)",
+                              golds_invalid, types_by_text)
 
 
 def save_error_analysis_csv(evaluator: NERELEvaluator, output_path: str):
@@ -583,6 +690,8 @@ def main():
                       help='Output CSV file with error analysis (FP/FN breakdown)')
     parser.add_argument('--errors_txt', default='nerel_error_analysis.txt',
                       help='Output TXT file with human-readable FP/FN breakdown grouped by type-pair + relation')
+    parser.add_argument('--annotation_conf', default=None,
+                      help='Path to annotation.conf — drop schema-violating FPs and flag gold violations')
     parser.add_argument('--verbose', action='store_true',
                       help='Print verbose output')
     
@@ -696,8 +805,11 @@ def main():
     # Save error analysis CSV
     save_error_analysis_csv(evaluator, args.errors_csv)
 
-    # Save human-readable error analysis TXT
-    save_error_analysis_txt(evaluator, args.errors_txt)
+    # Save human-readable error analysis TXT (optionally schema-filtered)
+    rules = AnnotationRuleParser(args.annotation_conf) if args.annotation_conf else None
+    if rules is not None:
+        print(f"Loaded {len(rules.relation_rules)} relation rules from {args.annotation_conf}")
+    save_error_analysis_txt(evaluator, args.errors_txt, rules=rules)
 
     print(f"\nDetailed results saved to: {args.output_file}")
     print(f"CSV results saved to: {args.csv_output}")

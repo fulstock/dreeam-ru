@@ -17,14 +17,20 @@ import argparse
 
 
 class AnnotationRuleParser:
-    """Parse NEREL annotation.conf [relations] section into {relation: (arg1_types, arg2_types)}."""
+    """Parse NEREL annotation.conf [relations] section into {relation: set of (h_type, t_type) pairs}.
 
-    def __init__(self, conf_path: str):
-        self.relation_rules: Dict[str, Tuple[Set[str], Set[str]]] = {}
+    A relation can have multiple lines in the conf; each line adds (Arg1 type) x (Arg2 type)
+    pairs to that relation's allowed set. This preserves cross-type vs same-type structure
+    (e.g. ABBREVIATION's 8 same-type lines do NOT mean cross-type combos are valid).
+    """
+
+    def __init__(self, conf_path: str, verbose: bool = False):
+        self.relation_rules: Dict[str, Set[Tuple[str, str]]] = {}
+        self.malformed_lines: List[Tuple[int, str]] = []
         in_relations = False
         with open(conf_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                line = line.strip()
+            for lineno, raw in enumerate(f, 1):
+                line = raw.strip()
                 if line == '[relations]':
                     in_relations = True
                     continue
@@ -32,26 +38,38 @@ class AnnotationRuleParser:
                     break
                 if not in_relations or not line or line.startswith('#'):
                     continue
-                self._parse_line(line)
+                # Skip the special <OVERLAP> entry — it uses <ENTITY> and isn't a real relation
+                if line.startswith('<'):
+                    continue
+                self._parse_line(line, lineno)
 
-    def _parse_line(self, line: str):
-        parts = line.split('\t')
-        if len(parts) < 2:
-            parts = re.split(r'\s{2,}', line)
-        if len(parts) < 2:
+        if verbose:
+            self.print_summary()
+
+    def _parse_line(self, line: str, lineno: int):
+        # Split into (relation_name, args_string) on first whitespace gap.
+        # This works for both tab-separated and multi-space-separated lines.
+        m = re.match(r'^(\S+)\s+(\S.*)$', line)
+        if not m:
+            self.malformed_lines.append((lineno, line))
             return
-        rel_name = parts[0].strip()
-        args_str = parts[1].strip()
+        rel_name = m.group(1).strip()
+        args_str = m.group(2).strip()
         arg_parts = args_str.split(',')
         if len(arg_parts) != 2:
+            self.malformed_lines.append((lineno, line))
             return
         arg1_match = re.search(r'Arg1:(.+)', arg_parts[0])
         arg2_match = re.search(r'Arg2:(.+)', arg_parts[1])
         if not arg1_match or not arg2_match:
+            self.malformed_lines.append((lineno, line))
             return
         arg1_types = self._parse_type_list(arg1_match.group(1).strip())
         arg2_types = self._parse_type_list(arg2_match.group(1).strip())
-        self.relation_rules[rel_name] = (arg1_types, arg2_types)
+        pairs = self.relation_rules.setdefault(rel_name, set())
+        for a1 in arg1_types:
+            for a2 in arg2_types:
+                pairs.add((a1, a2))
 
     def _parse_type_list(self, s: str) -> Set[str]:
         if '<ENTITY>' in s or '<ANY>' in s:
@@ -61,15 +79,38 @@ class AnnotationRuleParser:
             t = t.strip()
             if ':' in t:
                 t = t.split(':')[1]
-            out.add(t)
+            if t:
+                out.add(t)
         return out
 
     def is_valid(self, relation: str, h_type: str, t_type: str) -> bool:
         """True if this (h_type, relation, t_type) combination is allowed by the schema."""
         if relation not in self.relation_rules:
             return True  # unknown relation — don't filter
-        a1, a2 = self.relation_rules[relation]
-        return ('<ANY>' in a1 or h_type in a1) and ('<ANY>' in a2 or t_type in a2)
+        pairs = self.relation_rules[relation]
+        return (
+            (h_type, t_type) in pairs
+            or ('<ANY>', t_type) in pairs
+            or (h_type, '<ANY>') in pairs
+            or ('<ANY>', '<ANY>') in pairs
+        )
+
+    def print_summary(self):
+        """Print all parsed rules — useful for verifying the conf was loaded correctly."""
+        print("=" * 80)
+        print(f"Parsed {len(self.relation_rules)} relation types:")
+        print("=" * 80)
+        for rel in sorted(self.relation_rules.keys()):
+            pairs = sorted(self.relation_rules[rel])
+            print(f"\n{rel}  ({len(pairs)} allowed type-pairs):")
+            for h, t in pairs:
+                print(f"  [{h} → {t}]")
+        if self.malformed_lines:
+            print("\n" + "=" * 80)
+            print(f"WARNING: {len(self.malformed_lines)} malformed line(s) skipped:")
+            for ln, content in self.malformed_lines:
+                print(f"  line {ln}: {content!r}")
+        print("=" * 80)
 
 
 class BRATParser:
@@ -806,9 +847,11 @@ def main():
     save_error_analysis_csv(evaluator, args.errors_csv)
 
     # Save human-readable error analysis TXT (optionally schema-filtered)
-    rules = AnnotationRuleParser(args.annotation_conf) if args.annotation_conf else None
-    if rules is not None:
-        print(f"Loaded {len(rules.relation_rules)} relation rules from {args.annotation_conf}")
+    rules = None
+    if args.annotation_conf:
+        print(f"\nLoading annotation rules from {args.annotation_conf}")
+        rules = AnnotationRuleParser(args.annotation_conf, verbose=True)
+        print(f"Loaded {len(rules.relation_rules)} relation rules.")
     save_error_analysis_txt(evaluator, args.errors_txt, rules=rules)
 
     print(f"\nDetailed results saved to: {args.output_file}")

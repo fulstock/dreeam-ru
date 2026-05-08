@@ -17,10 +17,8 @@ except ImportError:
 # nltk.download('punkt')
 # ##
 
-ru_tokenizer = load("tokenizers/punkt/russian.pickle") # Загрузка токенизатора для русского языка
 word_tokenizer = NLTKWordTokenizer()
-
-morph = pymorphy2.MorphAnalyzer()
+# sent_tokenizer + morph initialized after argparse based on --lang
 
 brat2mrc_parser = argparse.ArgumentParser(description = "Brat to docred formatter script.")
 brat2mrc_parser.add_argument('--brat_dataset_path', type = str, required = True, help = "Path to brat dataset. Either a parent dir with train/dev/test subdirs, or a flat dir with .txt/.ann files (use --subsets none).")
@@ -31,8 +29,16 @@ brat2mrc_parser.add_argument('--rel_path', type = str, required = True, help = '
 brat2mrc_parser.add_argument('--docred_output_path', type = str, default = None, help = "Path, where formatted dataset would be stored. By default, same path as in --brat_dataset_path would be used.")
 brat2mrc_parser.add_argument('--split_length', type = int, default = 128, help = "Split length.")
 brat2mrc_parser.add_argument('--split_diff', type = int, default = 4, help = "Split difference (amount in sentences).")
+brat2mrc_parser.add_argument('--lang', type=str, default='russian', choices=['russian', 'english'],
+                             help='Language for sentence tokenizer + lemmatizer. Default: russian.')
 
 args = brat2mrc_parser.parse_args()
+
+sent_tokenizer = load(f"tokenizers/punkt/{args.lang}.pickle")
+if args.lang == 'russian':
+    morph = pymorphy2.MorphAnalyzer()
+else:
+    morph = None
 
 brat_dataset_path = args.brat_dataset_path
 
@@ -196,7 +202,7 @@ for ds in sets:
 
                     offset_mapping = []
 
-                    sentence_spans = list(ru_tokenizer.span_tokenize(txtdata))
+                    sentence_spans = list(sent_tokenizer.span_tokenize(txtdata))
                     tokenized_sentences = []
                     
                     for span in sentence_spans:
@@ -261,7 +267,7 @@ for ds in sets:
                     for entity_mentions_id, entity_type, start_char, end_char in zip(entity_mentions_ids, entity_types, entity_start_chars, entity_end_chars):
 
                         entity_mention = txtdata[start_char : end_char]
-                        entity_lemm_mention = morph.parse(entity_mention)[0].normal_form
+                        entity_lemm_mention = morph.parse(entity_mention)[0].normal_form if morph else entity_mention.lower()
 
                         # print(entity_mention, entity_type, start_char, end_char)
 

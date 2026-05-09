@@ -149,92 +149,103 @@ def convert_brat_to_inference_format(parsed_data: Dict) -> Tuple[str, List[Dict]
     
     return text, entities
 
-def process_files(test_dir: str, 
+def process_files(test_dir: str,
                   output_dir: str,
                   inference_model: DreeamInference,
                   max_files: int = None,
+                  topk_mentions: int = 1,
                   verbose: bool = True) -> Dict:
     """
-    Process all NEREL test files and evaluate predictions.
-    
+    Process all BRAT files and write predictions in BRAT format.
+
+    Each predicted vertex-level relation is disambiguated to ONE specific
+    (head_mention_id, tail_mention_id) pair using model evidence sentences
+    plus sentence-distance heuristics — no Cartesian product over coreferent
+    mentions (which previously inflated FP count and tanked CodaBench score).
+
     Args:
-        test_dir: Path to NEREL test directory
-        inference_model: DreeamInference instance
-        max_files: Maximum number of files to process (for testing)
-        verbose: Whether to print detailed progress
-        
-    Returns:
-        Evaluation results
+        topk_mentions: emit top-K mention pairs per vertex-level relation
+                       (1 = highest precision, default).
     """
     parser = BRATParser()
-    
-    # Find all text files
+
     txt_files = [f for f in os.listdir(test_dir) if f.endswith('.txt')]
-    
     if max_files:
         txt_files = txt_files[:max_files]
-    
+
+    os.makedirs(output_dir, exist_ok=True)
+
     processed_files = 0
-    total_gold_relations = 0
     total_pred_relations = 0
-    
-    print(f"Processing {len(txt_files)} files...")
-    
+    total_pred_emitted = 0
+
+    print(f"Processing {len(txt_files)} files (topk_mentions={topk_mentions})...")
+
     for txt_file in txt_files:
         base_name = os.path.splitext(txt_file)[0]
         txt_path = os.path.join(test_dir, txt_file)
         ann_path = os.path.join(test_dir, base_name + '.ann')
-        
+
         if not os.path.exists(ann_path):
             if verbose:
                 print(f"Warning: No annotation file for {txt_file}")
             continue
+
         parsed_data = parser.parse_file(txt_path, ann_path)
-        
-        # Convert to inference format
         text, entities = convert_brat_to_inference_format(parsed_data)
-        
-        if len(entities) < 2:  # Need at least 2 entities for relations
+
+        if len(entities) < 2:
             if verbose:
                 print(f"Skipping {txt_file}: insufficient entities ({len(entities)})")
             continue
 
-        # Run inference
-        pred_relations_list = inference_model.predict_single(text, entities, base_name)
-        pred_relations = set(pred_relations_list)
-        
-        total_pred_relations += len(pred_relations)
+        # Mention-level predictions (one row per mention pair, not Cartesian)
+        pred_pairs = inference_model.predict_relations_with_mentions(
+            [text], [entities], [base_name], topk_mentions=topk_mentions
+        )[0]
 
-        with open(os.path.join(output_dir, txt_file), "w", encoding = "UTF-8", newline='') as tf:
-            print("Writing text of file", txt_file, "into", os.path.join(output_dir, txt_file))
+        total_pred_relations += len(pred_pairs)
+
+        with open(os.path.join(output_dir, txt_file), "w", encoding="UTF-8", newline='') as tf:
             tf.write(text)
 
-        with open(os.path.join(output_dir, txt_file.replace('.txt','.ann')), "w", encoding = "UTF-8", newline='') as af:
-            print("Writing ner golds and rel perds of file", txt_file.replace('.txt','.ann'), "into", os.path.join(output_dir, txt_file.replace('.txt','.ann')))
-            for p_idx, p in enumerate(sorted(list(entities), key = lambda e : (e["start"], e["type"], e["end"]))):
-                af.write("T" + str(p_idx + 1) + "\t" + p["type"] + " " + str(p["start"]) + " " + str(p["end"]) + "\t" + p["text"] + "\n")
-            p_idx = 0
-            for p in sorted(list(pred_relations)):
-                # Handle both (s,e,t) and (s,e,t,text) formats
-                h, t, r = p
+        out_ann = os.path.join(output_dir, txt_file.replace('.txt', '.ann'))
+        with open(out_ann, "w", encoding="UTF-8", newline='') as af:
+            # Re-emit entities with sequential T-ids in offset order, but also
+            # build a map from original BRAT id -> new id so relations stay valid.
+            sorted_ents = sorted(list(entities), key=lambda e: (e["start"], e["type"], e["end"]))
+            id_remap = {}
+            for p_idx, p in enumerate(sorted_ents):
+                new_tid = f"T{p_idx + 1}"
+                id_remap[p["id"]] = new_tid
+                af.write(f"{new_tid}\t{p['type']} {p['start']} {p['end']}\t{p['text']}\n")
 
-                for h1 in parsed_data["entityspan2id"][h]:
-                    for t2 in parsed_data["entityspan2id"][t]:
-                        af.write("R" + str(p_idx + 1) + "\t" + r + " Arg1:" + str(h1) + " Arg2:" + str(t2) + "\n")
-                        p_idx += 1
-        
+            # Deduplicate (head_id, tail_id, relation) — same pair predicted
+            # multiple times (e.g., from multiple chunks) collapses to one R-line.
+            seen = set()
+            r_idx = 0
+            for pp in pred_pairs:
+                key = (pp['head_id'], pp['tail_id'], pp['relation'])
+                if key in seen:
+                    continue
+                seen.add(key)
+                h_new = id_remap.get(pp['head_id'])
+                t_new = id_remap.get(pp['tail_id'])
+                if h_new is None or t_new is None:
+                    continue
+                r_idx += 1
+                af.write(f"R{r_idx}\t{pp['relation']} Arg1:{h_new} Arg2:{t_new}\n")
+                total_pred_emitted += 1
+
         processed_files += 1
-        
+
         if verbose:
-            print(f"Processed {base_name}: {len(entities)} entities, {len(pred_relations)} predicted relations")
-            
-            if len(pred_relations) > 0:
-                print(f"  Sample predictions: {list(pred_relations)[:3]}")
-    
+            print(f"Processed {base_name}: {len(entities)} entities, "
+                  f"{len(pred_pairs)} pred (after dedup: {r_idx})")
+
     print(f"\nProcessed {processed_files} files")
-    print(f"Total predicted relations: {total_pred_relations}")
-    
-    return 
+    print(f"Total mention-level predictions emitted: {total_pred_emitted}")
+    return
 
 def main():
     """Main function."""
@@ -249,9 +260,12 @@ def main():
                       help='Path to configuration file')
     parser.add_argument('--max_files', type=int, default=None,
                       help='Maximum number of files to process (for testing)')
+    parser.add_argument('--topk_mentions', type=int, default=1,
+                      help='Mention pairs to emit per predicted vertex-level relation '
+                           '(1=highest precision, default; >1 trades precision for recall)')
     parser.add_argument('--verbose', action='store_true',
                       help='Print verbose output')
-    
+
     args = parser.parse_args()
     
     # Check if test directory exists
@@ -287,10 +301,11 @@ def main():
     
     process_files(
         test_dir=args.test_dir,
-        output_dir = args.output_dir,
+        output_dir=args.output_dir,
         inference_model=inference_model,
         max_files=args.max_files,
-        verbose=args.verbose
+        topk_mentions=args.topk_mentions,
+        verbose=args.verbose,
     )
 
 if __name__ == "__main__":

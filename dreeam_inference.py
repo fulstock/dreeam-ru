@@ -2,6 +2,7 @@ import os
 import json
 import torch
 import numpy as np
+from collections import defaultdict
 from typing import List, Dict, Tuple, Optional
 from transformers import AutoConfig, AutoModel, AutoTokenizer
 from torch.utils.data import DataLoader
@@ -377,26 +378,30 @@ class DreeamInference:
             
             current_char = sent_start + len(sentence)
         
-                # Group entities by their text (handle coreference)
+        # Group entities by (text, type) — same text with different types are
+        # different concepts and must NOT be merged. Within a (text, type) group,
+        # multiple occurrences are mentions of the same entity (coreference).
         entity_groups = {}
         for entity in entities:
             entity_text = entity['text']
-            if entity_text not in entity_groups:
-                entity_groups[entity_text] = []
-            
+            entity_type = entity.get('type', 'ENTITY')
+            group_key = (entity_text, entity_type)
+            if group_key not in entity_groups:
+                entity_groups[group_key] = []
+
             # Find token positions for this entity
             start_char = entity['start']
             end_char = entity['end']
-            
+
             # Validate character positions
             if start_char >= end_char or start_char < 0 or end_char > len(text):
                 continue
-            
+
             # Find the sentence and token positions
             sent_id = None
             start_token = None
             end_token = None
-            
+
             # Look for the sentence containing this entity
             found_positions = False
             for char_pos in range(start_char, min(end_char, len(text))):
@@ -408,7 +413,7 @@ class DreeamInference:
                     if s_id == sent_id:
                         end_token = t_id + 1  # Exclusive end
                         found_positions = True
-            
+
             # Fallback: if we can't find exact positions, try to find the entity in sentences
             if not found_positions:
                 for s_id, sent_tokens in enumerate(tokenized_sents):
@@ -421,19 +426,20 @@ class DreeamInference:
                             break
                     if found_positions:
                         break
-                    
+
             if sent_id is not None and start_token is not None and end_token is not None:
                 # Ensure valid token positions
-                if (sent_id < len(tokenized_sents) and 
-                    start_token < len(tokenized_sents[sent_id]) and 
+                if (sent_id < len(tokenized_sents) and
+                    start_token < len(tokenized_sents[sent_id]) and
                     end_token <= len(tokenized_sents[sent_id]) and
                     start_token < end_token):
-                    
-                    entity_groups[entity_text].append({
+
+                    entity_groups[group_key].append({
                         'name': entity['text'],
                         'sent_id': sent_id,
                         'pos': [start_token, end_token],
-                        'type': entity.get('type', 'ENTITY')
+                        'type': entity_type,
+                        'id': entity.get('id'),  # carry BRAT entity id for mention-level output
                     })
         
         # Create vertex set from entity groups
@@ -654,37 +660,13 @@ class DreeamInference:
             'tag': tag
         }
     
-    def predict_relations(self, 
-                         texts: List[str], 
-                         entities_list: List[List[Dict]],
-                         titles: Optional[List[str]] = None) -> List[List[Tuple]]:
+    def _run_inference(self, samples: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
         """
-        Predict relations for a batch of texts.
-        
-        Args:
-            texts: List of input text strings
-            entities_list: List of entity lists, where each entity list contains
-                          dictionaries with keys: 'text', 'start', 'end', 'type'
-            titles: Optional list of document titles
-            
-        Returns:
-            List of relation predictions for each document, where each prediction
-            is a tuple of (head_entity_text, tail_entity_text, relation_type)
+        Run model inference and return official-format results + samples.
+        Shared between predict_relations and predict_relations_with_mentions.
         """
-        
-        if titles is None:
-            titles = [f"document_{i}" for i in range(len(texts))]
-        
-        # Convert to DocRED format
-        samples = []
-        for i, (text, entities) in enumerate(zip(texts, entities_list)):
-            sample = self._convert_to_docred_format(text, entities, titles[i])
-            samples.append(sample)
-        
-        # Create features
         features = self._create_features(samples)
-        
-        # Run inference
+
         dataloader = DataLoader(features, batch_size=self.batch_size, shuffle=False,
                                collate_fn=collate_fn, drop_last=False,
                                num_workers=4, pin_memory=True, prefetch_factor=2)
@@ -692,15 +674,14 @@ class DreeamInference:
         all_preds = []
         all_scores = []
         all_topks = []
-        all_logits = []  # Collect logits for per-class thresholds
+        all_logits = []
+        all_evi_preds = []
 
         with torch.no_grad():
             for batch in dataloader:
                 inputs = self._load_input(batch, tag="test")
-
                 outputs = self.model(**inputs)
 
-                # Collect logits if we have per-class thresholds
                 if self.optimized_thresholds is not None and "logits" in outputs:
                     all_logits.append(outputs["logits"].cpu())
 
@@ -712,12 +693,14 @@ class DreeamInference:
                     all_scores.append(outputs["scores"].cpu().numpy())
                     all_topks.append(outputs["topks"].cpu().numpy())
 
-        # Concatenate predictions
+                if "evi_pred" in outputs:
+                    all_evi_preds.append(outputs["evi_pred"].cpu().numpy())
+
         preds = np.concatenate(all_preds, axis=0)
         scores = np.concatenate(all_scores, axis=0) if len(all_scores) > 0 else []
         topks = np.concatenate(all_topks, axis=0) if len(all_topks) > 0 else []
+        evi_preds = np.concatenate(all_evi_preds, axis=0) if len(all_evi_preds) > 0 else []
 
-        # Apply per-class thresholds if available
         if self.optimized_thresholds is not None and len(all_logits) > 0:
             logits_concat = torch.cat(all_logits, dim=0)
             preds_optimized = apply_per_class_thresholds(
@@ -728,11 +711,8 @@ class DreeamInference:
             preds = preds_optimized.cpu().numpy()
             print(f"✓ Applied optimized thresholds to {logits_concat.shape[0]} predictions")
 
-        # Check if features are chunked (have entity_map field)
         if len(features) > 0 and 'entity_map' in features[0]:
             print(f"\n=== Merging {len(features)} chunk predictions ===")
-
-            # Prepare scores for merging (convert to list of arrays per feature)
             scores_list = []
             if len(scores) > 0:
                 idx = 0
@@ -741,7 +721,6 @@ class DreeamInference:
                     scores_list.append(scores[idx:idx + num_pairs])
                     idx += num_pairs
 
-            # Merge chunk predictions
             merged_features, merged_preds, merged_scores = merge_chunk_predictions(
                 features=features,
                 preds=preds,
@@ -749,20 +728,146 @@ class DreeamInference:
                 id2rel=self.id2rel,
                 merge_strategy='union'
             )
-
-            # Update features and predictions with merged results
             features = merged_features
             preds = merged_preds
-
             if merged_scores is not None and len(merged_scores) > 0:
                 scores = np.concatenate(merged_scores, axis=0)
+            # NB: chunk merging does not currently merge evi_preds; per-mention
+            # disambiguation in chunked mode falls back to the adjacency heuristic.
+            evi_preds = []
 
-        # Convert to official format
-        official_results, results = to_official(self.id2rel, preds, features,
-                                              scores=scores, topks=topks)
+        official_results, _ = to_official(self.id2rel, preds, features,
+                                          evi_preds=evi_preds,
+                                          scores=scores, topks=topks)
+        return official_results, samples
 
-        # Convert to simple tuple format
+    def predict_relations(self,
+                         texts: List[str],
+                         entities_list: List[List[Dict]],
+                         titles: Optional[List[str]] = None) -> List[List[Tuple]]:
+        """
+        Predict relations for a batch of texts.
+
+        Returns:
+            List per document of (head_entity_text, tail_entity_text, relation_type) tuples.
+        """
+        if titles is None:
+            titles = [f"document_{i}" for i in range(len(texts))]
+
+        samples = [self._convert_to_docred_format(t, e, titles[i])
+                   for i, (t, e) in enumerate(zip(texts, entities_list))]
+        official_results, samples = self._run_inference(samples)
         return self._convert_to_simple_format(official_results, samples)
+
+    def predict_relations_with_mentions(self,
+                                        texts: List[str],
+                                        entities_list: List[List[Dict]],
+                                        titles: Optional[List[str]] = None,
+                                        topk_mentions: int = 1) -> List[List[Dict]]:
+        """
+        Predict relations and disambiguate to specific mention pairs.
+
+        Each input entity dict should carry an 'id' field (BRAT entity id).
+        For each predicted vertex-level relation, picks the best mention pair
+        using model evidence sentences (when available) and sentence/token
+        adjacency as fallback.
+
+        Args:
+            topk_mentions: emit the top-K mention pairs per predicted relation.
+                           1 = highest precision (default), >1 trades off recall.
+
+        Returns:
+            List per document of dicts:
+              {head_id, tail_id, head_text, tail_text, relation,
+               evidence: [sent_ids], score, h_sent, t_sent}
+        """
+        if titles is None:
+            titles = [f"document_{i}" for i in range(len(texts))]
+
+        samples = [self._convert_to_docred_format(t, e, titles[i])
+                   for i, (t, e) in enumerate(zip(texts, entities_list))]
+        official_results, samples = self._run_inference(samples)
+        return self._convert_to_mention_pairs(official_results, samples,
+                                              topk_mentions=topk_mentions)
+
+    def _convert_to_mention_pairs(self,
+                                  official_results: List[Dict],
+                                  samples: List[Dict],
+                                  topk_mentions: int = 1) -> List[List[Dict]]:
+        """
+        Disambiguate vertex-level predictions to mention-pair-level outputs.
+
+        Scoring per (head_mention, tail_mention) pair:
+          +20 if BOTH mentions in evidence sentences
+          +10 if EITHER mention in evidence sentences
+          - sentence_distance * 2  (closer sentences preferred)
+          - token_distance / 100   (tiebreaker on closeness)
+        """
+        title_to_results = defaultdict(list)
+        for r in official_results:
+            title_to_results[r['title']].append(r)
+
+        out: List[List[Dict]] = []
+        for sample in samples:
+            doc_pairs: List[Dict] = []
+            vset = sample['vertexSet']
+            for result in title_to_results.get(sample['title'], []):
+                h_idx, t_idx = result['h_idx'], result['t_idx']
+                relation = result['r']
+                if relation == "Na":
+                    continue
+                if not (0 <= h_idx < len(vset) and 0 <= t_idx < len(vset)):
+                    continue
+                h_mentions = vset[h_idx]
+                t_mentions = vset[t_idx]
+                if not h_mentions or not t_mentions:
+                    continue
+
+                evidence_sents = set(result.get('evidence', []) or [])
+                ranked = self._rank_mention_pairs(h_mentions, t_mentions, evidence_sents)
+
+                for h_m, t_m, pair_score in ranked[:max(1, topk_mentions)]:
+                    if h_m.get('id') is None or t_m.get('id') is None:
+                        continue
+                    doc_pairs.append({
+                        'head_id': h_m['id'],
+                        'tail_id': t_m['id'],
+                        'head_text': h_m['name'],
+                        'tail_text': t_m['name'],
+                        'relation': relation,
+                        'evidence': sorted(evidence_sents),
+                        'score': float(result.get('score', 0.0)),
+                        'pair_score': pair_score,
+                        'h_sent': h_m['sent_id'],
+                        't_sent': t_m['sent_id'],
+                    })
+            out.append(doc_pairs)
+        return out
+
+    @staticmethod
+    def _rank_mention_pairs(h_mentions: List[Dict], t_mentions: List[Dict],
+                            evidence_sents: set) -> List[Tuple[Dict, Dict, float]]:
+        """Return all (h_mention, t_mention, score) sorted by score descending."""
+        scored = []
+        for h in h_mentions:
+            for t in t_mentions:
+                if h is t:
+                    continue
+                score = 0.0
+                h_in_evi = h['sent_id'] in evidence_sents
+                t_in_evi = t['sent_id'] in evidence_sents
+                if h_in_evi and t_in_evi:
+                    score += 20.0
+                elif h_in_evi or t_in_evi:
+                    score += 10.0
+                sent_dist = abs(h['sent_id'] - t['sent_id'])
+                score -= 2.0 * sent_dist
+                if h['sent_id'] == t['sent_id']:
+                    tok_dist = abs(h['pos'][0] - t['pos'][0])
+                    score -= tok_dist / 100.0
+                scored.append((h, t, score))
+        scored.sort(key=lambda x: -x[2])
+        return scored
     
     def _convert_to_simple_format(self, 
                                  official_results: List[Dict], 

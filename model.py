@@ -302,8 +302,11 @@ class DocREModel(nn.Module):
         logits = self.forward_rel(hs, ts, rs)
         output["rel_pred"] = self.loss_fnt.get_label(logits, num_labels=self.num_labels)
 
-        if sent_labels != None: # human-annotated evidence available
-
+        # Compute evidence predictions whenever we have sent_pos
+        # (in test/dev mode, sent_labels is None but s_attn is still useful for
+        #  evidence-guided mention disambiguation downstream)
+        need_evi = (sent_labels is not None) or (tag in ["test", "dev"])
+        if need_evi and sent_pos is not None:
             s_attn = self.forward_evi(doc_attn, sent_pos, batch_rel, offset)
             output["evi_pred"] = F.pad(s_attn > self.evi_thresh, (0, self.max_sent_num - s_attn.shape[-1]))
 
